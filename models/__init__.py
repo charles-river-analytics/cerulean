@@ -1,1 +1,1 @@
-from . import core
+from . import factor

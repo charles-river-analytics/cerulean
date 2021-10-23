@@ -77,3 +77,10 @@ def mle_train(
             logging.info(f"On iteration {j}, -ELBO = {loss}")
         losses[j] = loss
     return losses
+
+def query(
+    model: Callable,
+    fs2dim: collections.OrderedDict[str,tuple[int,int]],
+    variables: str
+) -> torch.Tensor:
+    return model(fs2dim, query_var=variables)

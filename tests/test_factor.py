@@ -31,8 +31,13 @@ def test_integration_1():
         ])
     })
 
-    losses = models.core.mle_train(
-        models.core.factor_model,
+    losses = models.factor.mle_train(
+        models.factor.factor_model,
         (fs2dim,),
         dict(data=data),
     )
+
+    # get and display all marginals
+    for var in ["a", "b", "c"]:
+        p_var = models.factor.query(models.factor.factor_model, fs2dim, var)
+        logging.info(f"p({var}) = {p_var}")
