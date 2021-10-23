@@ -9,12 +9,14 @@ import pyro.distributions.constraints as constraints
 from pyro.ops.contract import einsum
 import torch
 
-
 def joint_conditioned(eq: str, *tensors):
     return einsum(eq, *tensors, modulo_total=True)[0]
 
 
 def marginal(eq: str, *tensors):
+    """
+    Computes the exact marginal distribution via (cached) variable elimination.
+    """
     unscaled = joint_conditioned(eq, *tensors)
     return (unscaled / torch.sum(unscaled))
 
@@ -29,7 +31,7 @@ def build_network_string(fs_list: list[str]):
 
 def factor_model(
     fs2dim: collections.OrderedDict[str,tuple[int,int]],
-    data: dict=dict(),
+    data: Optional[collections.OrderedDict[str,torch.Tensor]]=None,
     query_var: Optional[str]=None
 ) -> Optional[torch.Tensor]:
     factors = collections.OrderedDict()
@@ -58,8 +60,8 @@ def mle_train(
     model: Callable,
     model_args: tuple,
     model_kwargs: dict,
-    num_iterations:int=1000,
-    lr:float=0.01,
+    num_iterations: int=1000,
+    lr: float=0.01,
 ) -> torch.Tensor:
     guide = lambda *args, **kwargs: None
     opt = pyro.optim.Adam(dict(lr=lr))
