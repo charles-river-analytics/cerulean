@@ -128,6 +128,9 @@ class Factor:
 
     def get_table(self,):
         return self.table
+
+    def get_factor(self,):
+        return pyro.param(make_factor_name(self.fs))
     
     def _post_evidence(self, var: int, level: int):
         if not self.table:
@@ -180,7 +183,7 @@ class FactorGraph:
 
     def __init__(self, *factors: Factor,):
         self.factors = collections.OrderedDict({
-            factor.name: factor for factor in factors
+            factor.fs: factor for factor in factors
         })
         self.id = type(self)._next_id()
         self.fs2dim = collections.OrderedDict({
@@ -195,6 +198,9 @@ class FactorGraph:
             s += f"\t{f},\n"
         s +=")"
         return s
+
+    def get_factor(self, fs: str):
+        return self.factors[fs].get_factor()
 
     def post_evidence(self, var: str, level: int):
         ev = (var, level)
