@@ -6,18 +6,31 @@ import torch
 
 import models
 
-def test_integration_1():
-    da, db, dc = 2, 3, 4
-    fs2dim = collections.OrderedDict({
+
+def dims():
+    return (2, 3, 4)
+
+
+def get_fs2dim(dims):
+    da, db, dc = dims
+    return collections.OrderedDict({
         "ab": (da, db),  # shape = 2 * 3 = 6
         "bc": (db, dc),  # shape = 3 * 4 = 12
         "ca": (dc, da)   # shape = 4 * 2 = 8
     })
-    data = collections.OrderedDict({
+
+
+def get_data():
+    return collections.OrderedDict({
         "ab": torch.tensor([1, 1, 2, 1, 5]),
         "bc": torch.tensor([5, 5, 6, 4, 2]),
         "ca": torch.tensor([6, 6, 7, 2, 2])
     })
+
+
+def test_integration_1():
+    fs2dim = get_fs2dim(dims())
+    data = get_data()
     factor_graph, losses_from_training = models.factor.FactorGraph.learn(
         fs2dim, data
     )
@@ -39,3 +52,22 @@ def test_integration_1():
         normalized_clique_factor = clique_factor / torch.sum(clique_factor)
     logging.info(f"Normalized clique factor = {normalized_clique_factor}")
     assert not torch.equal(normalized_clique_factor, p_clique)  # other marginal effects matter!
+
+    # check out difference between observing 0, 1 and 2 variables
+    logging.info(f"Factor graph shapes: {factor_graph.get_shapes()}")
+    p_a = factor_graph.query("a").get_table()
+    logging.info(f"Before posting evidence, p(a) = {p_a}")
+
+    logging.info(f"Posting b evidence")
+    factor_graph.post_evidence("b", 2)
+    p_a_cond_b = factor_graph.query("a").get_table()
+    logging.info(f"Factor graph shapes: {factor_graph.get_shapes()}")
+    logging.info(f"After posting b evidence, p(a) = {p_a_cond_b}")
+
+    # NOTE: factor graph *is stateful* so b evidence has already been posted!!!
+    logging.info("Posting c evidence")
+    factor_graph.post_evidence("c", 2)
+    p_a_cond_bc = factor_graph.query("a").get_table()
+    logging.info(f"Factor graph shapes: {factor_graph.get_shapes()}")
+    logging.info(f"After posting b and c evidence, p(a) = {p_a_cond_bc}")
+    

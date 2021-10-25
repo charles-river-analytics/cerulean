@@ -114,7 +114,7 @@ class Factor:
         self.table = table
         self.shape = None if self.table is None else self.table.shape
 
-        self._variables = [var for var in self.name]
+        self._variables = [var for var in self.fs]
         self._variables_to_axis = collections.OrderedDict({
             var: i for (i, var) in enumerate(self._variables)
         })
@@ -132,8 +132,8 @@ class Factor:
     def get_factor(self,):
         return pyro.param(make_factor_name(self.fs))
     
-    def _post_evidence(self, var: int, level: int):
-        if not self.table:
+    def _post_evidence(self, var: str, level: int):
+        if self.table is None:
             raise ValueError(f"Factor {self.name}'s table has not been initialized!")
         if var in self._variables:
             axis = self._variables_to_axis[var]
@@ -142,15 +142,16 @@ class Factor:
                 axis,
                 torch.tensor(level).type(torch.long)
             )
-            new_table /= torch.sum(new_table)
             new_shape = new_table.shape
-
-        return Factor(
-            self.name,
-            self.fs,
-            new_shape,
-            new_table,
-        )
+            return Factor(
+                self.name,
+                self.fs,
+                new_shape,
+                new_table,
+            )
+        else:
+            logging.debug(f"Variable {var} not in factor {self.name}")
+            return self
 
 
 class FactorGraph:
@@ -199,6 +200,11 @@ class FactorGraph:
         s +=")"
         return s
 
+    def get_shapes(self,):
+        return collections.OrderedDict({
+            ix: f.shape for (ix, f) in self.factors.items()
+        })
+
     def get_factor(self, fs: str):
         return self.factors[fs].get_factor()
 
@@ -208,14 +214,23 @@ class FactorGraph:
             for name in self.factors.keys():
                 self.factors[name] = self.factors[name]._post_evidence(var, level)
             self._evidence_cache.append(ev)
+            self.fs2dim[name] = self.factors[name].shape
         else:
-            raise ValueError(f"Already posted evidence {ev}.")
+            raise ValueError(f"Already posted evidence {ev}.") 
 
     def query(self, variables: str):
-        result_table = factor_model(self.fs2dim, query_var=variables)
+        # NOTE: have to pass explicitly since we copy and alter tensors
+        # taken from param store
+        network_string = build_network_string(list(self.fs2dim.keys()))
+        with torch.no_grad():
+            result_table = marginal(
+                f"{network_string}->{variables}",
+                *[factor.table for factor in self.factors.values()]
+            )
         return Factor(
             f"{self.id}-query={variables}",
             variables,
             result_table.shape,
             result_table
         )
+        
