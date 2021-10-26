@@ -1,5 +1,6 @@
 import collections
 import logging
+import time
 
 import pytest
 import torch
@@ -28,6 +29,10 @@ def get_data():
     })
 
 
+def to_micro(t0, t1):
+    return round(1e6 * (t1 - t0), 3)
+
+
 def test_integration_1():
     fs2dim = get_fs2dim(dims())
     data = get_data()
@@ -53,21 +58,30 @@ def test_integration_1():
     logging.info(f"Normalized clique factor = {normalized_clique_factor}")
     assert not torch.equal(normalized_clique_factor, p_clique)  # other marginal effects matter!
 
+    # note time to do three inference calculations as well
     # check out difference between observing 0, 1 and 2 variables
     logging.info(f"Factor graph shapes: {factor_graph.get_shapes()}")
+    t0 = time.time()
     p_a = factor_graph.query("a").get_table()
+    t1 = time.time()
     logging.info(f"Before posting evidence, p(a) = {p_a}")
+    logging.info(f"Took {to_micro(t0, t1)}us to compute p(a)")
 
     logging.info(f"Posting b evidence")
+    t0 = time.time()
     factor_graph.post_evidence("b", 2)
     p_a_cond_b = factor_graph.query("a").get_table()
+    t1 = time.time()
     logging.info(f"Factor graph shapes: {factor_graph.get_shapes()}")
     logging.info(f"After posting b evidence, p(a) = {p_a_cond_b}")
+    logging.info(f"Took {to_micro(t0, t1)}us to post b evidence and compute p(a|b)")
 
     # NOTE: factor graph *is stateful* so b evidence has already been posted!!!
     logging.info("Posting c evidence")
+    t0 = time.time()
     factor_graph.post_evidence("c", 2)
     p_a_cond_bc = factor_graph.query("a").get_table()
+    t1 = time.time()
     logging.info(f"Factor graph shapes: {factor_graph.get_shapes()}")
     logging.info(f"After posting b and c evidence, p(a) = {p_a_cond_bc}")
-    
+    logging.info(f"Took {to_micro(t0, t1)}us to post c evidence and compute p(a|b,c)")

@@ -233,4 +233,3 @@ class FactorGraph:
             result_table.shape,
             result_table
         )
-        
