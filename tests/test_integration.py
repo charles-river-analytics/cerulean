@@ -36,7 +36,7 @@ def to_micro(t0, t1):
 def test_integration_1():
     fs2dim = get_fs2dim(dims())
     data = get_data()
-    factor_graph, losses_from_training = models.factor.FactorGraph.learn(
+    factor_graph, losses_from_training = models.factor.DiscreteFactorGraph.learn(
         fs2dim, data
     )
     logging.info(f"Learned a factor graph: {factor_graph}")

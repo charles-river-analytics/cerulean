@@ -10,15 +10,15 @@ from pyro.ops.contract import einsum
 import torch
 
 
-def joint_conditioned(eq: str, *tensors: torch.Tensor):
+def discrete_joint_conditioned(eq: str, *tensors: torch.Tensor):
     return einsum(eq, *tensors, modulo_total=True)[0]
 
 
-def marginal(eq: str, *tensors: torch.Tensor):
+def discrete_marginal(eq: str, *tensors: torch.Tensor):
     """
-    Computes the exact marginal distribution via (cached) variable elimination.
+    Computes the exact discrete_marginal distribution via (cached) variable elimination.
     """
-    unscaled = joint_conditioned(eq, *tensors)
+    unscaled = discrete_joint_conditioned(eq, *tensors)
     return (unscaled / torch.sum(unscaled))
 
 
@@ -34,7 +34,7 @@ def make_factor_name(fs):
     return f"f_{fs}"
 
 
-def factor_model(
+def discrete_factor_model(
     fs2dim: collections.OrderedDict[str,tuple[int,...]],
     data: Optional[collections.OrderedDict[str,torch.Tensor]]=None,
     query_var: Optional[str]=None
@@ -50,7 +50,7 @@ def factor_model(
 
     if not query_var:
         for var in fs2dim.keys():
-            pr = marginal(f"{network_string}->{var}", *factors.values())
+            pr = discrete_marginal(f"{network_string}->{var}", *factors.values())
             with pyro.plate(f"{var}-plate") as ix:
                 pyro.sample(
                     f"{var}-data",
@@ -59,7 +59,7 @@ def factor_model(
                 )
     else:
         with torch.no_grad():
-            return marginal(f"{network_string}->{query_var}", *factors.values())
+            return discrete_marginal(f"{network_string}->{query_var}", *factors.values())
 
 def mle_train(
     model: Callable,
@@ -91,7 +91,7 @@ def query(
     return model(fs2dim, query_var=variables)
 
 
-class Factor:
+class DiscreteFactor:
 
     def __init__(
         self,
@@ -120,7 +120,7 @@ class Factor:
         })
 
     def __repr__(self,):
-        s = "Factor("
+        s = "DiscreteFactor("
         s += f"name={self.name}, "
         s += f"fs={self.fs}, "
         s += f"dim={self.dim})"
@@ -134,7 +134,7 @@ class Factor:
     
     def _post_evidence(self, var: str, level: int):
         if self.table is None:
-            raise ValueError(f"Factor {self.name}'s table has not been initialized!")
+            raise ValueError(f"DiscreteFactor {self.name}'s table has not been initialized!")
         if var in self._variables:
             axis = self._variables_to_axis[var]
             new_table = torch.index_select(
@@ -143,25 +143,25 @@ class Factor:
                 torch.tensor(level).type(torch.long)
             )
             new_shape = new_table.shape
-            return Factor(
+            return DiscreteFactor(
                 self.name,
                 self.fs,
                 new_shape,
                 new_table,
             )
         else:
-            logging.debug(f"Variable {var} not in factor {self.name}")
+            logging.debug(f"Variable {var} not in DiscreteFactor {self.name}")
             return self
 
 
-class FactorGraph:
+class DiscreteFactorGraph:
 
     count = 0
     
     @classmethod
     def _next_id(cls):
         cls.count += 1
-        return f"FactorGraph{cls.count}"
+        return f"DiscreteFactorGraph{cls.count}"
 
     @classmethod
     def learn(
@@ -170,31 +170,31 @@ class FactorGraph:
         data: collections.OrderedDict[str, torch.Tensor],
     ):
         losses = mle_train(
-            factor_model,
+            discrete_factor_model,
             (fs2dim,),
             dict(data=data),
         )
         factors = [
-            Factor(f"Factor({fs})", fs, dim, pyro.param(make_factor_name(fs)))
+            DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, pyro.param(make_factor_name(fs)))
             for (fs, dim) in fs2dim.items()
         ]
         new_factor_graph = cls(*factors)
         assert new_factor_graph.fs2dim == fs2dim
         return (new_factor_graph, losses)
 
-    def __init__(self, *factors: Factor,):
+    def __init__(self, *factors: DiscreteFactor,):
         self.factors = collections.OrderedDict({
-            factor.fs: factor for factor in factors
+            DiscreteFactor.fs: DiscreteFactor for DiscreteFactor in factors
         })
         self.id = type(self)._next_id()
         self.fs2dim = collections.OrderedDict({
-            factor.fs: factor.dim for factor in self.factors.values()
+            DiscreteFactor.fs: DiscreteFactor.dim for DiscreteFactor in self.factors.values()
         })
 
         self._evidence_cache = list()
 
     def __repr__(self,):
-        s = f"FactorGraph(id={self.id}\n"
+        s = f"DiscreteFactorGraph(id={self.id}\n"
         for f in self.factors.values():
             s += f"\t{f},\n"
         s +=")"
@@ -223,11 +223,11 @@ class FactorGraph:
         # taken from param store
         network_string = build_network_string(list(self.fs2dim.keys()))
         with torch.no_grad():
-            result_table = marginal(
+            result_table = discrete_marginal(
                 f"{network_string}->{variables}",
-                *[factor.table for factor in self.factors.values()]
+                *[DiscreteFactor.table for DiscreteFactor in self.factors.values()]
             )
-        return Factor(
+        return DiscreteFactor(
             f"{self.id}-query={variables}",
             variables,
             result_table.shape,
