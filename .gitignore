@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# admin information
+licenses_used.txt
+
 # C extensions
 *.so
 
