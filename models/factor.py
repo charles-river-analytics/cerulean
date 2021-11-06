@@ -50,22 +50,22 @@ def discrete_factor_model(
     data: Optional[collections.OrderedDict[str,torch.Tensor]]=None,
     query_var: Optional[str]=None
 ) -> Optional[torch.Tensor]:
-"""A Pyro model corresponding to a discrete factor graph. This model supports both MLE parameter
-learning and inference.
+    """A Pyro model corresponding to a discrete factor graph. This model supports both MLE parameter
+    learning and inference.
 
-This function takes a `collections.OrderedDict` of {dimension name string: dimension size tuple}, e.g., 
-{"ab": (2, 3), "bc": (3, 4)}. NOTE: this functionality is suboptimal because it does not allow for 
-multiple factors that relate the same dimensions (e.g., one that maps probabilities and another that 
-maps constraints). TODO: this must be fixed. 
+    This function takes a `collections.OrderedDict` of {dimension name string: dimension size tuple}, e.g., 
+    {"ab": (2, 3), "bc": (3, 4)}. NOTE: this functionality is suboptimal because it does not allow for 
+    multiple factors that relate the same dimensions (e.g., one that maps probabilities and another that 
+    maps constraints). TODO: this must be fixed. 
 
-If `data` is not None, then this function scores the observed data against the current values of the factors
-using Pyro machiner. TODO: it should be possible to instead request a fully Bayesian treatment.
-Alternatively, if `query_var` is not None, this function performs exact inference using 
-(cached) variable elimination to find the marginal distribution of the query variables. For example, 
-in the factor graph implicitly defined by the `fs2dim` of `{"ab": (2, 3), "bc": (3, 4)}`, 
-setting `query_var="ac" would infer the marginal probability `p(a,c)`, while `query_var="b"` would infer the 
-marginal probability `p(b)` and `query_var="abc"` would compute the entire joint density `p(a,b,c)`.
-"""
+    If `data` is not None, then this function scores the observed data against the current values of the factors
+    using Pyro machiner. TODO: it should be possible to instead request a fully Bayesian treatment.
+    Alternatively, if `query_var` is not None, this function performs exact inference using 
+    (cached) variable elimination to find the marginal distribution of the query variables. For example, 
+    in the factor graph implicitly defined by the `fs2dim` of `{"ab": (2, 3), "bc": (3, 4)}`, 
+    setting `query_var="ac" would infer the marginal probability `p(a,c)`, while `query_var="b"` would infer the 
+    marginal probability `p(b)` and `query_var="abc"` would compute the entire joint density `p(a,b,c)`.
+    """
     factors = collections.OrderedDict()
     for fs, dim in fs2dim.items():
         factors[fs] = pyro.param(
@@ -95,16 +95,16 @@ def mle_train(
     num_iterations: int=1000,
     lr: float=0.01,
 ) -> torch.Tensor:
-"""Trains the parameters of an MLE model. NOTE: the model must actually be an MLE model 
-(i.e., have no latent random variables) as this function maximizes the ELBO using an empty 
-guide, which will result in an error if the model has latent random variables.
+    """Trains the parameters of an MLE model. NOTE: the model must actually be an MLE model 
+    (i.e., have no latent random variables) as this function maximizes the ELBO using an empty 
+    guide, which will result in an error if the model has latent random variables.
 
-The callable model must be a Pyro stochastic function, while the model_args and model_kwargs are the 
-positional and keyword arguments that the model requires. The optimization will proceed for `num_iterations`
-iterations using the learning rate `lr`. NOTE: right now this uses the Adam optimizer. We should a) allow the user
-to specify what optimizers they want to use and b) experiment with choices of optimizer on real problems to 
-see if we can find heuristics on which ones are better choices conditioned on context. 
-"""
+    The callable model must be a Pyro stochastic function, while the model_args and model_kwargs are the 
+    positional and keyword arguments that the model requires. The optimization will proceed for `num_iterations`
+    iterations using the learning rate `lr`. NOTE: right now this uses the Adam optimizer. We should a) allow the user
+    to specify what optimizers they want to use and b) experiment with choices of optimizer on real problems to 
+    see if we can find heuristics on which ones are better choices conditioned on context. 
+    """
     guide = lambda *args, **kwargs: None
     opt = pyro.optim.Adam(dict(lr=lr))
     loss = pyro.infer.Trace_ELBO()
@@ -125,9 +125,9 @@ def query(
     fs2dim: collections.OrderedDict[str,tuple[int,...]],
     variables: str
 ) -> torch.Tensor:
-"""Runs the probabilistic query against the callable Pyro stochastic function. 
-See documentation of `discrete_factor_model` for more details. 
-"""
+    """Runs the probabilistic query against the callable Pyro stochastic function. 
+    See documentation of `discrete_factor_model` for more details. 
+    """
     return model(fs2dim, query_var=variables)
 
 
@@ -143,18 +143,18 @@ class DiscreteFactor:
         dim: Union[torch.Size, tuple[int,...]],
         table: Optional[torch.Tensor]=None,
     ):
-    """
-    A `DiscreteFactor` takes parameters:
+        """
+        A `DiscreteFactor` takes parameters:
 
-    + `name`: name of the factor
-    + `fs`: dimension labeling/specification. For example, if the factor relates variables `a` and `b`,
-        we would have `fs = "ab"`. 
-    + `dim`: the shape of the dimensions. For example, if the variable `a` could take on three values
-        and the variable `b` could take on seventy, we would have `dim = (3, 70)`.
-    + `table`: optional, corresponds to values of the factor (i.e., the values in the factor will not be
-        learned from data). Defaults to `None` as usually this `__init__` method will be called from 
-        the `DiscreteFactorGraph` class's `.learn(...)` method.
-    """
+        + `name`: name of the factor
+        + `fs`: dimension labeling/specification. For example, if the factor relates variables `a` and `b`,
+            we would have `fs = "ab"`. 
+        + `dim`: the shape of the dimensions. For example, if the variable `a` could take on three values
+            and the variable `b` could take on seventy, we would have `dim = (3, 70)`.
+        + `table`: optional, corresponds to values of the factor (i.e., the values in the factor will not be
+            learned from data). Defaults to `None` as usually this `__init__` method will be called from 
+            the `DiscreteFactorGraph` class's `.learn(...)` method.
+        """
         if len(fs) != len(dim):
             raise ValueError(
                     f"Dimension specification {fs} doesn't match dims {dim}"
@@ -217,13 +217,15 @@ class DiscreteFactor:
                 torch.tensor(level).type(torch.long)
             )
             new_shape = new_table.shape
+            # note that the new table is *not* normalized
+            # because this is now a likelihood function
             return DiscreteFactor(
                 self.name,
                 self.fs,
                 new_shape,
                 new_table,
             )
-        else:
+        else:  # TODO: should this be an error or a no-op (as it is now)?
             logging.debug(f"Variable {var} not in DiscreteFactor {self.name}")
             return self
 
@@ -247,10 +249,19 @@ class DiscreteFactorGraph:
         fs2dim: collections.OrderedDict[str, tuple[int,...]],
         data: collections.OrderedDict[str, torch.Tensor],
     ):
-    """Learns parameters of factors in a factor graph from data.
+        """Learns parameters of factors in a factor graph from data.
 
-    
-    """
+        + `fs2dim`: `collections.OrderedDict` of {variable specification string: tuple of dimension sizes}.
+            For example, if variable `a` had 4 levels and variable `b` had 7 levels, `fs2dim` would have
+            an entry `"ab": (4, 7)`. 
+        + `data`: `collections.OrderedDict` of {variable specification string: observations tensor}. 
+            All observations tensors must be the same length; their length is equal to the number of 
+            observations of model state. The observations tensors must be 1d. The numbers in them 
+            correspond to the index that would occur when the multidimensional index corresponding 
+            to an observation across multiple variables in the factor was flattened.
+            TODO: make this description less confusing
+            TODO: refactor how data is represented, should instead be with a pandas.DataFrame or similar
+        """
         losses = mle_train(
             discrete_factor_model,
             (fs2dim,),
@@ -283,14 +294,28 @@ class DiscreteFactorGraph:
         return s
 
     def get_shapes(self,):
+        """Returns dimensions of each factor in a `collections.OrderedDict`
+        """
         return collections.OrderedDict({
             ix: f.shape for (ix, f) in self.factors.items()
         })
 
     def get_factor(self, fs: str):
+        """Returns the factor corresponding to the dimension string
+        `fs`. TODO: this should be updated to return factor by name
+        instead of by dimension string; right now this has the implicit
+        assumption that each dimension string is unique, which does not
+        have to be the case.
+        """
         return self.factors[fs].get_factor()
 
     def post_evidence(self, var: str, level: int):
+        """Posts evidence to the factor graph. 
+
+        Calls `._post_evidence(var, level)` on each factor that
+        contains `var`; see documentation of `._post_evidence(...)`
+        in `DiscreteFactor`. 
+        """
         ev = (var, level)
         if ev not in self._evidence_cache:
             for name in self.factors.keys():
@@ -301,9 +326,22 @@ class DiscreteFactorGraph:
             raise ValueError(f"Already posted evidence {ev}.") 
 
     def query(self, variables: str):
+        """Queries the factor graph for marginal or posterior distribution 
+        corresponding to `variables`. Returns a `DiscreteFactor` instance. 
+
+        Interpretation by example: suppose the factor graph has two factors, 
+        `ab` and `bc`. Passing `variables = "b"` to this method computes
+        `p(b)`. If evidence has first been applied, e.g., by calling 
+        `.post_evidence("c", 2)`, then this method returns `p(b | c = 2)`. 
+        Passing `variables = "ab" after calling `.post_evidence("c", 2)` 
+        would return `p(a, b | c = 2)`, and so on.
+        """
+        # TODO: should we call network_string on initialization and then
+        # update only if we add / remove factors from network?
+        # this adds to query time as is. 
+        network_string = ",".join(self.fs2dim.keys())
         # NOTE: have to pass explicitly since we copy and alter tensors
         # taken from param store
-        network_string = ",".join(self.fs2dim.keys())
         with torch.no_grad():
             result_table = discrete_marginal(
                 f"{network_string}->{variables}",
