@@ -231,7 +231,8 @@ class DiscreteFactor:
 
 
 class DiscreteFactorGraph:
-    """A `DiscreteFactorGraph` is a collection of `DiscreteFactor`s which together constitute
+    """
+    A `DiscreteFactorGraph` is a collection of `DiscreteFactor`s which together constitute
     a bipartite graph linking variables to factors. The graph is represented only implicitly;
     no graph is ever constructed.
     """
