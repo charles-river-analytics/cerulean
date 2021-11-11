@@ -8,7 +8,8 @@
 ## Testing
 This project uses `pytest`. 
 
-+  In the top-level directory, run `/opt/anaconda3/envs/proper-fm/bin/python -m pytest` to execute all tests. 
++  In the top-level directory, run `/opt/anaconda3/envs/proper-fm/bin/python -m pytest --cov=models` 
+    to execute all tests and see statistics of test coverage.
 
 ## Documentation
 
