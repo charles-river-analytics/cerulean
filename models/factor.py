@@ -257,14 +257,14 @@ class DiscreteFactor(FactorNode):
             return self
 
 
-class FactorGrapb:
+class FactorGraph:
 
     @abc.abstractmethod
     def snapshot(self,):
         ...
 
 
-class DiscreteFactorGraph(FactorGrapb):
+class DiscreteFactorGraph(FactorGraph):
     """
     A `DiscreteFactorGraph` is a collection of `DiscreteFactor`s which together constitute
     a bipartite graph linking variables to factors. The graph is represented only implicitly;
