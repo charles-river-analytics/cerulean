@@ -1,4 +1,6 @@
+import abc
 import collections
+import datetime
 import logging
 from typing import Callable, Optional, Union
 
@@ -29,7 +31,7 @@ def discrete_marginal(eq: str, *tensors: torch.Tensor):
     Computes the exact discrete_marginal distribution via (cached) variable elimination.
 
     This method dispatches to `discrete_joint_conditioned` which computes 
-    `p(V, E = e)`. This method then computes
+    :math:`p(V, E = e)`. This method then computes
     `p(V | E = e) = p(V, E = e) / p(E = e)`. 
     """
     unscaled = discrete_joint_conditioned(eq, *tensors)
@@ -131,7 +133,14 @@ def query(
     return model(fs2dim, query_var=variables)
 
 
-class DiscreteFactor:
+class FactorNode:
+
+    @abc.abstractmethod
+    def snapshot(self,):
+        ...
+
+
+class DiscreteFactor(FactorNode):
     """A `DiscreteFactor` is an object-oriented wrapper around a `torch.tensor` that is
     interpreted as a factor node in a factor graph. 
     """
@@ -173,6 +182,24 @@ class DiscreteFactor:
         self._variables_to_axis = collections.OrderedDict({
             var: i for (i, var) in enumerate(self._variables)
         })
+
+    def snapshot(self,):
+        """
+        Snapshots the state of a factor. Returns 
+        a new factor with values identical to the original iff the original
+        factor has a non-null table. Otherwise raises `ValueError` as this 
+        method should be called only when a factor has been initialized.
+        """
+        if self.table is None:
+            raise ValueError(
+                "Can't take a snapshot of factor with uninitialized table"
+            )
+        return DiscreteFactor(
+            self.name,
+            self.fs,
+            self.dim,
+            self.table.clone().detach(),
+        )
 
     def __repr__(self,):
         s = "DiscreteFactor("
@@ -230,7 +257,14 @@ class DiscreteFactor:
             return self
 
 
-class DiscreteFactorGraph:
+class FactorGrapb:
+
+    @abc.abstractmethod
+    def snapshot(self,):
+        ...
+
+
+class DiscreteFactorGraph(FactorGrapb):
     """
     A `DiscreteFactorGraph` is a collection of `DiscreteFactor`s which together constitute
     a bipartite graph linking variables to factors. The graph is represented only implicitly;
@@ -272,25 +306,44 @@ class DiscreteFactorGraph:
             DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, pyro.param(make_factor_name(fs)))
             for (fs, dim) in fs2dim.items()
         ]
-        new_factor_graph = cls(*factors)
+        new_factor_graph = cls(*factors, ts=None)
         assert new_factor_graph.fs2dim == fs2dim
         return (new_factor_graph, losses)
 
-    def __init__(self, *factors: DiscreteFactor,):
+    def __init__(
+        self,
+        *factors: DiscreteFactor,
+        ts: Optional[datetime.datetime]=None
+    ):
+        self.ts = ts
         self.factors = collections.OrderedDict({
-            DiscreteFactor.fs: DiscreteFactor for DiscreteFactor in factors
+            f.fs: f for f in factors
         })
         self.id = type(self)._next_id()
         self.fs2dim = collections.OrderedDict({
-            DiscreteFactor.fs: DiscreteFactor.dim for DiscreteFactor in self.factors.values()
+            f.fs: f.dim for f in self.factors.values()
         })
 
         self._evidence_cache = list()
+
+    def snapshot(self,):
+        """
+        Snapshots the state of a factor graph. Returns 
+        a new factor graph with values identical to the original
+        and a `.ts` attribute indicating a microsecond-level timestamp
+        of when the snapshot was taken.
+        """
+        return DiscreteFactorGraph(
+            *(f.snapshot() for f in self.factors.values()),
+            ts=datetime.datetime.now()
+        )
 
     def __repr__(self,):
         s = f"DiscreteFactorGraph(id={self.id}\n"
         for f in self.factors.values():
             s += f"\t{f},\n"
+        if self.ts is not None:
+            s += f"\tts={self.ts}\n"
         s +=")"
         return s
 

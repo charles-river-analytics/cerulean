@@ -1,4 +1,5 @@
 import collections
+import datetime
 import logging
 import time
 
@@ -33,6 +34,30 @@ def to_micro(t0, t1):
     return round(1e6 * (t1 - t0), 3)
 
 
+def test_snapshot():
+    fs2dim = get_fs2dim(dims())
+    data = get_data()
+    old_fg, losses_from_training = models.factor.DiscreteFactorGraph.learn(
+        fs2dim, data
+    )
+    logging.info(f"Learned a factor graph: {old_fg}")
+    # snapshot allows us to tag state of a factor graph even if we
+    # repeatedly update its weights. Don't just call deepcoppy due to
+    # required errorchecks and detaching gradients
+    new_fg = old_fg.snapshot()
+    logging.info(f"Created a new factor graph via snapshot: {new_fg}")
+
+    for (old_f, new_f) in zip(old_fg.factors.values(), new_fg.factors.values()):
+        assert torch.equal(old_f.get_table(), new_f.get_table())
+
+    # modify original graph and check that the new one doesn't change
+    old_fg.factors["ab"].table[0, 1] += torch.tensor(1.0)
+    assert not torch.equal(
+        old_fg.factors["ab"].table,
+        new_fg.factors["ab"].table
+    )
+
+
 def test_integration_1():
     fs2dim = get_fs2dim(dims())
     data = get_data()
@@ -56,7 +81,8 @@ def test_integration_1():
     with torch.no_grad():
         normalized_clique_factor = clique_factor / torch.sum(clique_factor)
     logging.info(f"Normalized clique factor = {normalized_clique_factor}")
-    assert not torch.equal(normalized_clique_factor, p_clique)  # other marginal effects matter!
+    # other marginal effects matter!
+    assert not torch.equal(normalized_clique_factor, p_clique)  
 
     # note time to do three inference calculations as well
     # check out difference between observing 0, 1 and 2 variables
