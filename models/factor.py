@@ -133,10 +133,22 @@ def query(
     return model(fs2dim, query_var=variables)
 
 
-class FactorNode:
+class FactorNode(abc.ABC):
+    """
+    Abstract base class from which all factor nodes must inherit. 
+    Factor nodes must implement a `snapshot` method, which should return
+    a deep copy of the factor node without any linkage to global state 
+    of any kind (e.g., param store, gradient tape), and a
+    `_post_evidence` method which allows evidence to be posted to the
+    factor and returns an instance of `cls`.
+    """
 
     @abc.abstractmethod
     def snapshot(self,):
+        ...
+
+    @abc.abstractmethod
+    def _post_evidence(self, var, level):
         ...
 
 
@@ -257,10 +269,39 @@ class DiscreteFactor(FactorNode):
             return self
 
 
-class FactorGraph:
+class FactorGraph(abc.ABC):
+    """
+    Abstract base class from which all factor graphs must inherit.
+    Factor graphs must implement one class method and
+    three methods:
+
+    + `learn`: class method that returns an instance of the factor graph,
+        with initialized tables (i.e., tables that are non-null and probably
+        have been learned from data)
+    + `snapshot`: method that returns a copy of the factor graph
+        without any linkage to global state of any kind (e.g., 
+        param store, gradient tape)
+    + `post_evidence`: allows evidence to be posted to the factor graph. Should
+        return a factor graph with evidence posted to the factors. 
+    + `query`: run queries against the graph. Currently the queries take the
+        form of marginal clique probability distributions only.
+    """
+
+    @classmethod
+    @abc.abstractmethod
+    def learn(cls, *args, **kwargs):
+        ...
 
     @abc.abstractmethod
     def snapshot(self,):
+        ...
+
+    @abc.abstractmethod
+    def post_evidence(self, var, level):
+        ...
+
+    @abc.abstractmethod
+    def query(self, variables,):
         ...
 
 
