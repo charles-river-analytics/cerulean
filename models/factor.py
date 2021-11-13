@@ -92,7 +92,9 @@ def discrete_marginal(eq: str, *tensors: torch.Tensor):
 def make_factor_name(fs: str):
     """
     Makes a factor name from a dimension specification string. 
+    
     NOTE: right now this name is *not* unique. 
+    
     TODO: make this name unique. 
     """
     return f"f_{fs}"
@@ -107,12 +109,18 @@ def discrete_factor_model(
     learning and inference.
 
     This function takes a `collections.OrderedDict` of {dimension name string: dimension size tuple}, e.g., 
-    {"ab": (2, 3), "bc": (3, 4)}. NOTE: this functionality is suboptimal because it does not allow for 
+    {"ab": (2, 3), "bc": (3, 4)}. 
+    
+    NOTE: this functionality is suboptimal because it does not allow for 
     multiple factors that relate the same dimensions (e.g., one that maps probabilities and another that 
-    maps constraints). TODO: this must be fixed. 
+    maps constraints). 
+    
+    TODO: this must be fixed. 
 
     If `data` is not None, then this function scores the observed data against the current values of the factors
-    using Pyro machiner. TODO: it should be possible to instead request a fully Bayesian treatment.
+    using Pyro machiner. 
+    
+    TODO: it should be possible to instead request a fully Bayesian treatment.
     Alternatively, if `query_var` is not None, this function performs exact inference using 
     (cached) variable elimination to find the marginal distribution of the query variables. For example, 
     in the factor graph implicitly defined by the `fs2dim` of `{"ab": (2, 3), "bc": (3, 4)}`, 
@@ -148,13 +156,17 @@ def mle_train(
     num_iterations: int=1000,
     lr: float=0.01,
 ) -> torch.Tensor:
-    """Trains the parameters of an MLE model. NOTE: the model must actually be an MLE model 
+    """Trains the parameters of an MLE model. 
+    
+    NOTE: the model must actually be an MLE model 
     (i.e., have no latent random variables) as this function maximizes the ELBO using an empty 
     guide, which will result in an error if the model has latent random variables.
 
     The callable model must be a Pyro stochastic function, while the model_args and model_kwargs are the 
     positional and keyword arguments that the model requires. The optimization will proceed for `num_iterations`
-    iterations using the learning rate `lr`. NOTE: right now this uses the Adam optimizer. We should a) allow the user
+    iterations using the learning rate `lr`. 
+    
+    NOTE: right now this uses the Adam optimizer. We should a) allow the user
     to specify what optimizers they want to use and b) experiment with choices of optimizer on real problems to 
     see if we can find heuristics on which ones are better choices conditioned on context. 
     """
@@ -386,7 +398,9 @@ class DiscreteFactorGraph(FactorGraph):
             observations of model state. The observations tensors must be 1d. The numbers in them 
             correspond to the index that would occur when the multidimensional index corresponding 
             to an observation across multiple variables in the factor was flattened.
+
             TODO: make this description less confusing
+
             TODO: refactor how data is represented, should instead be with a pandas.DataFrame or similar
         """
         losses = mle_train(
@@ -448,7 +462,9 @@ class DiscreteFactorGraph(FactorGraph):
 
     def get_factor(self, fs: str):
         """Returns the factor corresponding to the dimension string
-        `fs`. TODO: this should be updated to return factor by name
+        `fs`. 
+        
+        TODO: this should be updated to return factor by name
         instead of by dimension string; right now this has the implicit
         assumption that each dimension string is unique, which does not
         have to be the case.
@@ -477,10 +493,10 @@ class DiscreteFactorGraph(FactorGraph):
 
         Interpretation by example: suppose the factor graph has two factors, 
         `ab` and `bc`. Passing `variables = "b"` to this method computes
-        `p(b)`. If evidence has first been applied, e.g., by calling 
-        `.post_evidence("c", 2)`, then this method returns `p(b | c = 2)`. 
+        :math:`p(b)`. If evidence has first been applied, e.g., by calling 
+        `.post_evidence("c", 2)`, then this method returns :math:`p(b | c = 2)`. 
         Passing `variables = "ab" after calling `.post_evidence("c", 2)` 
-        would return `p(a, b | c = 2)`, and so on.
+        would return :math:`p(a, b | c = 2)`, and so on.
         """
         # TODO: should we call network_string on initialization and then
         # update only if we add / remove factors from network?

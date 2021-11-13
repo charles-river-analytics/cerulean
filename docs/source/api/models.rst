@@ -1,9 +1,6 @@
 models
 =============
 
-models module
--------------
-
 factor module
 -------------
 

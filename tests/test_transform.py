@@ -3,8 +3,41 @@ import logging
 
 import numpy as np
 import pandas as pd
+import torch
 
 from models import transform
+
+
+def mock_train_data_dataframe():
+    return pd.DataFrame({
+        "a": [0, 0, 1, 0, 1],
+        "b": [0, 1, 2, 0, 1],
+        "c": [1, 0, 3, 2, 1]
+    })
+
+
+def test_convert_df_to_od_torch():
+    df = mock_train_data_dataframe()
+    logging.info(f"Original dataframe: {df}")
+    out = transform._df2od_torch(
+        df,
+        [["a", "b"], ["b", "c"], ["c", "a"]],
+        [(2, 3), (3, 4), (4, 2)]
+    )
+    logging.info(f"Converted df to od: {out}")
+    # check explicit values -- based on dataframe and passed dims,
+    # first element of ab is first element possible, so should have
+    # flattened index zero; likewise, third element of "bc" should 
+    # be max allowable by dims since it's the last for each
+    # variable placement -- so shoudld be 3 * 4 - 1 = 11
+    assert torch.equal(
+        out["ab"][0].type(torch.long),
+        torch.tensor(0).type(torch.long)
+    )
+    assert torch.equal(
+        out["bc"][2].type(torch.long),
+        torch.tensor(11).type(torch.long)
+    )
 
 
 def mock_price_dataframe():
