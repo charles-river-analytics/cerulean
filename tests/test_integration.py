@@ -3,30 +3,18 @@ import datetime
 import logging
 import time
 
+import pandas as pd
 import pytest
 import torch
 
 import models
 
 
-def dims():
-    return (2, 3, 4)
-
-
-def get_fs2dim(dims):
-    da, db, dc = dims
-    return collections.OrderedDict({
-        "ab": (da, db),  # shape = 2 * 3 = 6
-        "bc": (db, dc),  # shape = 3 * 4 = 12
-        "ca": (dc, da)   # shape = 4 * 2 = 8
-    })
-
-
 def get_data():
-    return collections.OrderedDict({
-        "ab": torch.tensor([1, 1, 2, 1, 5]),
-        "bc": torch.tensor([5, 5, 6, 4, 2]),
-        "ca": torch.tensor([6, 6, 7, 2, 2])
+    return pd.DataFrame({
+        "a": [0, 0, 1, 0, 1],
+        "b": [0, 1, 2, 0, 1],
+        "c": [1, 0, 3, 2, 1]
     })
 
 
@@ -35,10 +23,18 @@ def to_micro(t0, t1):
 
 
 def test_snapshot():
-    fs2dim = get_fs2dim(dims())
+    a_dim = models.dimensions.VariableDimensions("a", 2)
+    b_dim = models.dimensions.VariableDimensions("b", 3)
+    c_dim = models.dimensions.VariableDimensions("c", 4)
+
+    ab_dim = models.dimensions.FactorDimensions(a_dim, b_dim)
+    bc_dim = models.dimensions.FactorDimensions(b_dim, c_dim)
+    ca_dim = models.dimensions.FactorDimensions(c_dim, a_dim)
+
     data = get_data()
     old_fg, losses_from_training = models.factor.DiscreteFactorGraph.learn(
-        fs2dim, data
+        (ab_dim, bc_dim, ca_dim),
+        data
     )
     logging.info(f"Learned a factor graph: {old_fg}")
     # snapshot allows us to tag state of a factor graph even if we
@@ -59,10 +55,19 @@ def test_snapshot():
 
 
 def test_integration_1():
-    fs2dim = get_fs2dim(dims())
+    #fs2dim = get_fs2dim(dims())
+    a_dim = models.dimensions.VariableDimensions("a", 2)
+    b_dim = models.dimensions.VariableDimensions("b", 3)
+    c_dim = models.dimensions.VariableDimensions("c", 4)
+
+    ab_dim = models.dimensions.FactorDimensions(a_dim, b_dim)
+    bc_dim = models.dimensions.FactorDimensions(b_dim, c_dim)
+    ca_dim = models.dimensions.FactorDimensions(c_dim, a_dim)
+
     data = get_data()
     factor_graph, losses_from_training = models.factor.DiscreteFactorGraph.learn(
-        fs2dim, data
+        (ab_dim, bc_dim, ca_dim),
+        data
     )
     logging.info(f"Learned a factor graph: {factor_graph}")
 

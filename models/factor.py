@@ -51,14 +51,18 @@ import abc
 import collections
 import datetime
 import logging
-from typing import Callable, Optional, Union
+from typing import Callable, Iterable, Optional, Union
 
 import mypy
+import pandas as pd
 import pyro
 import pyro.distributions as dist
 import pyro.distributions.constraints as constraints
 from pyro.ops.contract import einsum
 import torch
+
+from . import dimensions
+from . import transform
 
 
 def discrete_joint_conditioned(eq: str, *tensors: torch.Tensor):
@@ -385,24 +389,20 @@ class DiscreteFactorGraph(FactorGraph):
     @classmethod
     def learn(
         cls,
-        fs2dim: collections.OrderedDict[str, tuple[int,...]],
-        data: collections.OrderedDict[str, torch.Tensor],
+        dimensions: Iterable[dimensions.FactorDimensions],
+        data: pd.DataFrame
     ):
         """Learns parameters of factors in a factor graph from data.
 
-        + `fs2dim`: `collections.OrderedDict` of {variable specification string: tuple of dimension sizes}.
-            For example, if variable `a` had 4 levels and variable `b` had 7 levels, `fs2dim` would have
-            an entry `"ab": (4, 7)`. 
-        + `data`: `collections.OrderedDict` of {variable specification string: observations tensor}. 
-            All observations tensors must be the same length; their length is equal to the number of 
-            observations of model state. The observations tensors must be 1d. The numbers in them 
-            correspond to the index that would occur when the multidimensional index corresponding 
-            to an observation across multiple variables in the factor was flattened.
-
-            TODO: make this description less confusing
-
-            TODO: refactor how data is represented, should instead be with a pandas.DataFrame or similar
+        + `dimensions`: an iterable of `FactorDimensions`, each of which describes the variables
+            related by that factor.
+        + `data`: `pandas.DataFrame`. Each column must be equal length and correspond to observations
+            of the variable given in the header of the column.
         """
+        variables = [d.get_variables() for d in dimensions]
+        dims = [d.get_dimensions() for d in dimensions]
+        data = transform._df2od_torch(data, variables, dims)
+        fs2dim = collections.OrderedDict((d.get_factor_spec() for d in dimensions))
         losses = mle_train(
             discrete_factor_model,
             (fs2dim,),

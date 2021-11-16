@@ -13,8 +13,8 @@ StationaryTransform = Literal["diff", "logdiff"]
 
 def _df2od_torch(
     df: pd.DataFrame,
-    variables: list[list[str]],
-    dimensions: list[tuple[int,...]]
+    variables: Iterable[Iterable[str]],
+    dimensions: Iterable[tuple[int,...]]
 ) -> collections.OrderedDict[str, torch.Tensor]:
     """
     Convert dataframe data with observations by variable to flattened observations
