@@ -11,6 +11,8 @@ class Dimensions:
     """
 
     def __init__(self, *variables: tuple[str, int]):
+        if len(variables) < 1:
+            raise ValueError("Must pass at least one (var, dim) tuple.")
         self.variables = variables
 
     def get_variables(self,) -> tuple[str]:
