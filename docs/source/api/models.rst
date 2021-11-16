@@ -1,6 +1,14 @@
 models
 =============
 
+dimensions module
+-----------------
+
+.. automodule:: models.dimensions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 factor module
 -------------
 
