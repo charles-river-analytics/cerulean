@@ -1,12 +1,43 @@
+import collections
 import datetime
 from typing import Callable, Iterable, Literal
 
 import mypy
 import numpy as np
 import pandas as pd
+import torch
 
 
 StationaryTransform = Literal["diff", "logdiff"]
+
+
+def _df2od_torch(
+    df: pd.DataFrame,
+    variables: Iterable[Iterable[str]],
+    dimensions: Iterable[tuple[int,...]]
+) -> collections.OrderedDict[str, torch.Tensor]:
+    """
+    Convert dataframe data with observations by variable to flattened observations
+    suitable for indexing into a factor (used for evaluating log probability).
+
+    + `df`: dataframe of data. Column names should be (string) variables, values in
+        columns should be (non-negative) integer levels of the variable. The dataframe
+        should have equal length columns and there should be no NaN values. 
+    + `variables`: each outer list corresponds to a unique factor, while each 
+        inner list is a list of string variables contained in the factor. 
+    + `dimensions`:  each tuple is that factor's dimensions. The length of the tuple
+        is equal to the degree of the factor.
+    """
+    out = collections.OrderedDict()
+    # each (variable, dimension) corresponds to a single factor's info
+    for (variable_list, dimension_tuple) in zip(variables, dimensions):
+        factor_index_values = [df[k].values for k in variable_list]
+        flattened_index_values = np.ravel_multi_index(
+            factor_index_values,
+            dimension_tuple
+        )
+        out["".join(variable_list)] = torch.Tensor(flattened_index_values)
+    return out
 
 
 def make_stationarizer(
