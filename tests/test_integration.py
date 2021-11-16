@@ -3,6 +3,7 @@ import datetime
 import logging
 import time
 
+import numpy as np
 import pandas as pd
 import pytest
 import torch
@@ -116,3 +117,44 @@ def test_integration_1():
     logging.info(f"Factor graph shapes: {factor_graph.get_shapes()}")
     logging.info(f"After posting b and c evidence, p(a) = {p_a_cond_bc}")
     logging.info(f"Took {to_micro(t0, t1)}us to post c evidence and compute p(a|b,c)")
+
+
+def test_visualization():
+    a_dim = models.dimensions.VariableDimensions("a", 2)
+    b_dim = models.dimensions.VariableDimensions("b", 3)
+    c_dim = models.dimensions.VariableDimensions("c", 4)
+
+    ab_dim = models.dimensions.FactorDimensions(a_dim, b_dim)
+    bc_dim = models.dimensions.FactorDimensions(b_dim, c_dim)
+    ca_dim = models.dimensions.FactorDimensions(c_dim, a_dim)
+
+    data = pd.DataFrame({
+        "a": [0, 0, 1, 0, 1],  # / 2
+        "b": [0, 1, 2, 0, 1],  # / 3
+        "c": [1, 0, 3, 2, 1]   # / 4
+    })
+    factor_graph, losses_from_training = models.factor.DiscreteFactorGraph.learn(
+        (ab_dim, bc_dim, ca_dim),
+        data
+    )
+    true_probs = (
+        np.array([3.0 / 5, 2.0 / 5]),
+        np.array([2.0 / 5, 2.0 / 5, 1.0 / 5]),
+        np.array([1.0 / 5, 2.0 / 5, 1.0 / 5, 1.0 / 5])
+    )
+
+    for (variable, prob) in zip(data.columns, true_probs):
+        models.visualization.probability_compare(
+            factor_graph,
+            variable,
+            prob,
+        )
+
+    # prob_ab = data[["a", "b"]].values
+    # prob_ab /= prob_ab.sum()
+
+    # models.visualization.probability_compare(
+    #     factor_graph,
+    #     "ab",
+    #     prob_ab
+    # )

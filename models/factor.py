@@ -6,11 +6,11 @@ import logging
 from typing import Callable, Iterable, Optional, Union
 
 import mypy
+import opt_einsum
 import pandas as pd
 import pyro
 import pyro.distributions as dist
 import pyro.distributions.constraints as constraints
-from pyro.ops.contract import einsum
 import torch
 
 from . import dimensions
@@ -21,14 +21,11 @@ def discrete_joint_conditioned(eq: str, *tensors: torch.Tensor):
     """
     Computes the distribution :math:`p(V, E = e)` via (cached) variable elimination. 
 
-    Wrapper around `pyro.ops.contract.einsum` that does not enforce normalization to 
-    a pmf (since that occurs in `discrete_marginal`).
-
     TODO: ensure that we are using the most optimal caching strategy internally. This 
     may involve actually using the underlying opt_einsum function call instead so that we can 
     specify what tensors remain constant and other optimizations.
     """
-    return einsum(eq, *tensors, modulo_total=True)[0]
+    return opt_einsum.contract(eq, *tensors)
 
 
 def discrete_marginal(eq: str, *tensors: torch.Tensor):
@@ -365,6 +362,7 @@ class DiscreteFactorGraph(FactorGraph):
             for (fs, dim) in fs2dim.items()
         ]
         new_factor_graph = cls(*factors, ts=None)
+        new_factor_graph._learned = True
         assert new_factor_graph.fs2dim == fs2dim
         return (new_factor_graph, losses)
 
@@ -383,6 +381,7 @@ class DiscreteFactorGraph(FactorGraph):
         })
 
         self._evidence_cache = list()
+        self._learned = False
 
     def snapshot(self,):
         """
