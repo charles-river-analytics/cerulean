@@ -119,7 +119,7 @@ def test_integration_1():
     logging.info(f"Took {to_micro(t0, t1)}us to post c evidence and compute p(a|b,c)")
 
 
-def test_visualization():
+def test_visualization_and_divergence():
     a_dim = models.dimensions.VariableDimensions("a", 2)
     b_dim = models.dimensions.VariableDimensions("b", 3)
     c_dim = models.dimensions.VariableDimensions("c", 4)
@@ -150,11 +150,20 @@ def test_visualization():
             prob,
         )
 
-    # prob_ab = data[["a", "b"]].values
-    # prob_ab /= prob_ab.sum()
+    prob_ab = pd.crosstab(
+        pd.Categorical(data.a.values, categories=[0, 1]),
+        pd.Categorical(data.b.values, categories=[0, 1, 2]),
+        dropna=False
+    )
+    prob_ab = prob_ab.values / prob_ab.values.sum()
+    models.visualization.probability_compare(
+        factor_graph,
+        "ab",
+        prob_ab
+    )
 
-    # models.visualization.probability_compare(
-    #     factor_graph,
-    #     "ab",
-    #     prob_ab
-    # )
+    # demonstrate kl divergence calculations
+    pred_ab = factor_graph.query("ab")
+    entropy = pred_ab.entropy()
+    logging.info(f"Computed entropy: {entropy} bits")
+    

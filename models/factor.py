@@ -6,6 +6,7 @@ import logging
 from typing import Callable, Iterable, Optional, Union
 
 import mypy
+import numpy as np
 import opt_einsum
 import pandas as pd
 import pyro
@@ -284,6 +285,59 @@ class DiscreteFactor(FactorNode):
             logging.debug(f"Variable {var} not in DiscreteFactor {self.name}")
             return self
 
+    def kl_divergence(self, other: Union["DiscreteFactor", np.ndarray]) -> float:
+        """
+        Compute the Kullback-Leibler (KL) divergence between this factor and another.
+
+        The KL divergence between this factor :math:`\psi` and another (normalized)
+        factor :math:`\phi` is equal to
+
+        .. math:: \mathrm{D}(\psi||\phi) = \sum_x \\frac{\psi(x)}{Z_\psi} 
+            \left[ \log \\frac{\psi(x)}{Z_\psi} - \log \\frac{\phi(x)}{Z_\phi} \\right].
+
+        The numbers :math:`Z` are the partition functions that convert the factors into proper
+        probability distributions. Note that the complexity of this method is exponential in the 
+        degree of the factor(s). NOTE: The logarithm is taken in base 2; the result has units of bits.
+        """
+        if type(other) == np.ndarray:
+            if tuple(other.shape) != tuple(self.table.shape):
+                raise ValueError(
+                    f"Mismatched sizes between {self} table and ndarray of shape {other.shape}!"
+                )
+            psi_k = self.table.numpy().flatten()
+            phi_k = other.flatten()
+        else:
+            if tuple(self.table.shape) != tuple(other.table.shape):
+                raise ValueError(
+                    f"Mismatched supports between {self} and {other}!"
+                )
+            psi_k = self.table.numpy().flatten()
+            phi_k = other.table.numpy().flatten()
+
+        psi_k /= psi_k.sum()
+        phi_k /= psi_k.sum()
+        return np.sum(
+            psi_k * (np.log2(psi_k) - np.log2(phi_k))
+        )
+
+    def entropy(self,) -> float:
+        """
+        Compute this factor's entropy.
+
+        The entropy for the factor :math:`\psi` is equal to
+
+        .. math:: \mathrm{H}(\psi) = -\sum_x \\frac{\psi(x)}{Z_\psi} \log \\frac{\psi(x)}{Z_\psi}.
+
+        The number :math:`Z_\psi` is the partition function that converts the factors into proper
+        probability distributions. Note that the complexity of this method is exponential in the 
+        degree of the factor. NOTE: The logarithm is taken in base 2; the result has units of bits.
+        """
+        psi_k = self.table.numpy().flatten()
+        psi_k /= psi_k.sum()
+        return np.sum(
+            -1.0 * psi_k * np.log2(psi_k)
+        )
+
 
 class FactorGraph(abc.ABC):
     """
@@ -458,7 +512,7 @@ class DiscreteFactorGraph(FactorGraph):
         with torch.no_grad():
             result_table = discrete_marginal(
                 f"{network_string}->{variables}",
-                *(DiscreteFactor.table for DiscreteFactor in self.factors.values())
+                *(DiscreteFactor.table for DiscreteFactor in self.factors.values()),
             )
         return DiscreteFactor(
             f"{self.id}-query={variables}",

@@ -19,27 +19,28 @@ def _probability_compare_1d(
     outpath,
 ):
     assert len(true) == len(pred)
+    labels = np.arange(len(true))
+    width = 0.35
     fig, ax = plt.subplots()
-    ax.bar(
-        range(len(true)),
-        true,
-        color="white",
-        alpha=0.3,
-        label="True",
-        width=0.5,
-        hatch="//",
-        edgecolor="black",
-    )
-    ax.bar(
-        range(len(pred)),
-        pred,
-        color="white",
-        alpha=0.3,
+    pred_bars = ax.bar(
+        labels - width/2, pred, width,
         label="Predicted",
-        width=0.5,
-        hatch="\\",
-        edgecolor="black",
+        hatch="//",
+        edgecolor="black"
     )
+    ax.bar_label(
+        pred_bars,
+        padding=3,
+        fmt="%.3f",
+    )
+    true_bars = ax.bar(
+        labels + width/2, true, width,
+        label="Empirical",
+        hatch="\\",
+        edgecolor="black"
+    )
+    ax.bar_label(true_bars, padding=3)
+    ax.set_xticks(labels)
     ax.set_xlabel(f"Level of {variables}")
     ax.set_ylabel(f"p({variables})")
     ax.legend()
@@ -52,9 +53,26 @@ def _probability_compare_2d(
     pred: np.ndarray,
     outpath,
 ):
-    fig, axes = plt.subplots(1, 2)
-    axes[0].imshow(true, interpolation="none")
-    axes[1].imshow(pred, interpolation="none")
+    fig, axes = plt.subplots(2, 1)
+    axes = axes.flatten()
+    axes[0].imshow(
+        true,
+        interpolation="none",
+        cmap="cividis",
+    )
+    true_display = axes[1].imshow(
+        pred,
+        interpolation="none",
+        cmap="cividis",
+    )
+    axes[0].set_xticks(range(true.shape[1]))
+    axes[0].set_yticks(range(true.shape[0]))
+    axes[1].set_xticks(range(true.shape[1]))
+    axes[1].set_yticks(range(true.shape[0]))
+
+    fig.subplots_adjust(right=0.85)
+    cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
+    fig.colorbar(true_display, cax=cbar_ax)
 
     plt.savefig(outpath / f"{variables}-marginal.png")
 
