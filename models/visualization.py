@@ -116,6 +116,16 @@ def probability_compare(
     true: np.ndarray,
     outpath=DEFAULT_OUTPATH,
 ):
+    """
+    Plot univariate and bivariate probability distributions and compare them 
+    with data. 
+
+    + `fg`: a factor graph. The `variables` will be passed to `.query(...)`,
+        computing a marginal (possibly conditional) probability distribution.
+    + `variables`: the marginal query to run.
+    + `true`: an array of numbers representing the "true" or empirical probability distribution.
+    + `outpath`: location to save figures
+    """
     len_variables = len(variables)
     if len_variables > 2:
         raise ValueError(
