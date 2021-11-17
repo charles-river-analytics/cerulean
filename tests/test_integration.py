@@ -150,20 +150,24 @@ def test_visualization_and_divergence():
             prob,
         )
 
-    prob_ab = pd.crosstab(
-        pd.Categorical(data.a.values, categories=[0, 1]),
-        pd.Categorical(data.b.values, categories=[0, 1, 2]),
-        dropna=False
-    )
-    prob_ab = prob_ab.values / prob_ab.values.sum()
-    models.visualization.probability_compare(
-        factor_graph,
-        "ab",
-        prob_ab
-    )
-
     # demonstrate kl divergence calculations
-    pred_ab = factor_graph.query("ab")
-    entropy = pred_ab.entropy()
-    logging.info(f"Computed entropy: {entropy} bits")
-    
+    for pair, dim in zip(["ab", "bc", "ca"], [(2, 3), (3, 4), (4, 2)]):
+
+        val_1, val_2 = pair
+        d1, d2 = dim
+
+        prob_pair = pd.crosstab(
+            pd.Categorical(data[val_1].values, categories=list(range(d1))),
+            pd.Categorical(data[val_2].values, categories=list(range(d2))),
+            dropna=False
+        )
+        prob_pair = prob_pair.values / prob_pair.values.sum()
+        models.visualization.probability_compare(
+            factor_graph,
+            pair,
+            prob_pair
+        )
+
+        pred_pair = factor_graph.query(pair)
+        entropy = pred_pair.entropy()
+        logging.info(f"Computed {pair} entropy: {entropy} bits")
