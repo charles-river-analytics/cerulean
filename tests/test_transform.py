@@ -119,7 +119,7 @@ def test_inference_with_stationary():
     )
     logging.info(f"Stationarized records: {stationary}")
 
-    n_cutpoints = 111
+    n_cutpoints = 11
     discrete_stationary = transform.continuous_to_variable_level(
         stationary,
         n_cutpoints,
@@ -147,7 +147,14 @@ def test_inference_with_stationary():
     d_bn = dimensions.FactorDimensions(
         bats_dim, nyse_dim
     )
-    factor_graph, losses_from_training = factor.DiscreteFactorGraph.learn(
+    logging.info("Training with auto min/max")
+    factor_graph_2, losses_from_training_2 = factor.DiscreteFactorGraph.learn(
         (d_nn, d_nb, d_bn),
         discrete_stationary.rename(columns=names)
+    )
+
+    logging.info("Training with user-set min/max")
+    factor_graph_2, losses_from_training_2 = factor.DiscreteFactorGraph.learn(
+        (d_nn, d_nb, d_bn),
+        discrete_stationary_minmax.rename(columns=names)
     )
