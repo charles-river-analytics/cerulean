@@ -3,6 +3,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
 from models import dimensions, factor, transform
@@ -108,6 +109,8 @@ def test_diff_stationary():
     ) is None
 
 
+@pytest.mark.slow
+@pytest.mark.training
 def test_inference_with_stationary():
     records = mock_price_dataframe()
     records = records.resample('us').ffill()
@@ -132,29 +135,22 @@ def test_inference_with_stationary():
         0.02
     )
 
-    names = transform.get_names2strings("NYSE", "NASDAQ", "BATS")
+    dim_factory = dimensions.DimensionsFactory("NYSE", "NASDAQ", "BATS")
+    dim_factory("NYSE", n_cutpoints)
+    dim_factory("NASDAQ", n_cutpoints)
+    dim_factory("BATS", n_cutpoints)
+    d_nn = dim_factory(("NYSE", "NASDAQ"))
+    d_nb = dim_factory(("NASDAQ", "BATS"))
+    d_bn = dim_factory(("BATS", "NYSE"))
 
-    nyse_dim = dimensions.VariableDimensions(names["NYSE"], n_cutpoints)
-    nasdaq_dim = dimensions.VariableDimensions(names["NASDAQ"], n_cutpoints)
-    bats_dim = dimensions.VariableDimensions(names["BATS"], n_cutpoints)
-
-    d_nn = dimensions.FactorDimensions(
-        nyse_dim, nasdaq_dim
-    )
-    d_nb = dimensions.FactorDimensions(
-        nasdaq_dim, bats_dim
-    )
-    d_bn = dimensions.FactorDimensions(
-        bats_dim, nyse_dim
-    )
     logging.info("Training with auto min/max")
     factor_graph_2, losses_from_training_2 = factor.DiscreteFactorGraph.learn(
         (d_nn, d_nb, d_bn),
-        discrete_stationary.rename(columns=names)
+        discrete_stationary.rename(columns=dim_factory.mapping())
     )
 
     logging.info("Training with user-set min/max")
     factor_graph_2, losses_from_training_2 = factor.DiscreteFactorGraph.learn(
         (d_nn, d_nb, d_bn),
-        discrete_stationary_minmax.rename(columns=names)
+        discrete_stationary_minmax.rename(columns=dim_factory.mapping())
     )

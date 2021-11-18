@@ -23,6 +23,8 @@ def to_micro(t0, t1):
     return round(1e6 * (t1 - t0), 3)
 
 
+@pytest.mark.slow
+@pytest.mark.training
 def test_snapshot():
     a_dim = models.dimensions.VariableDimensions("a", 2)
     b_dim = models.dimensions.VariableDimensions("b", 3)
@@ -55,6 +57,8 @@ def test_snapshot():
     )
 
 
+@pytest.mark.slow
+@pytest.mark.training
 def test_integration_1():
     #fs2dim = get_fs2dim(dims())
     a_dim = models.dimensions.VariableDimensions("a", 2)
@@ -119,6 +123,8 @@ def test_integration_1():
     logging.info(f"Took {to_micro(t0, t1)}us to post c evidence and compute p(a|b,c)")
 
 
+@pytest.mark.slow
+@pytest.mark.training
 def test_visualization_and_divergence():
     a_dim = models.dimensions.VariableDimensions("a", 2)
     b_dim = models.dimensions.VariableDimensions("b", 3)

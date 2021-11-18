@@ -1,5 +1,9 @@
 
+from typing import Optional, Union
+
 import mypy
+
+from . import transform
 
 
 class Dimensions:
@@ -80,3 +84,59 @@ class FactorDimensions(Dimensions):
     def __repr__(self,):
         return f"FactorDimensions({self.variables})"
 
+
+class DimensionsFactory:
+    """
+    Helper for creating `VariableDimensions` and `FactorDimensions`. 
+
+    Example usage::
+    
+        # create a factory
+        factory = DimensionFactory("my variable", "my other variable")
+
+        # actually register the variables and their dimensions
+        factory("my variable", 10)  # has 10 cutpoints
+        factory("my other variable", 29)  # has 29 cutpoints
+        
+        # make some factor dimensions
+        fd1 = factory(("my variable",))  # dimensions for factor of degree 1
+        fd2 = factory(("my variable", "my other variable"))  # dimensions for factor of degree 2
+    
+    Calling this object raises `ValueError` if variable names don't exist.
+    """
+
+    def __init__(self, *variable_names: str):
+        self.names2strings = transform.get_names2strings(*variable_names)
+        self.names2variables = dict()
+
+    def __call__(
+        self,
+        names: Union[str,tuple[str,...]],
+        n_cutpoints: Optional[int]=None
+    ) -> Union[VariableDimensions, FactorDimensions]:
+        #return VariableDimensions(self.names2strings[name], n_cutpoints)
+        if type(names) is str:
+            if n_cutpoints is None:
+                raise ValueError("Must pass n_cutpoints for variable dimension generation!")
+            vd = VariableDimensions(self.names2strings[names], n_cutpoints)
+            self.names2variables[names] = vd
+
+        elif type(names) is tuple:
+            if n_cutpoints is not None:
+                raise ValueError("n_cutpoints already defined by variables!")
+            if not all((x in self.names2strings.keys() for x in names)):
+                raise ValueError("At least one of the names isn't associated with a variable!")
+            return FactorDimensions(*(self.names2variables[name] for name in names))
+
+    def mapping(self,) -> dict[str, str]:
+        """
+        Returns the mapping from variable names to their string representations used 
+        by `opt_einsum`.
+        """
+        return self.names2strings
+
+    def get_variable(self, name: str) -> VariableDimensions:
+        """
+        Returns a dict of `{name: VariableDimension}`.
+        """
+        return self.names2variables[name]

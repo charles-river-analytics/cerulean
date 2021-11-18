@@ -3,3 +3,8 @@ log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+markers = [
+    "slow: marks tests as slow",
+    "training: marks tests as involving a training step",
+    "scaling: marks tests as involving a scaling study"
+]
