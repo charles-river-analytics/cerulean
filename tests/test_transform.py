@@ -119,7 +119,7 @@ def test_inference_with_stationary():
     )
     logging.info(f"Stationarized records: {stationary}")
 
-    n_cutpoints = 11
+    n_cutpoints = 111
     discrete_stationary = transform.continuous_to_variable_level(
         stationary,
         n_cutpoints,
