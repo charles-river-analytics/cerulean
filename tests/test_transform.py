@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from models import transform
+from models import dimensions, factor, transform
 
 
 def mock_train_data_dataframe():
@@ -106,3 +106,41 @@ def test_diff_stationary():
         records.iloc[1:],
         check_exact=False,
     ) is None
+
+
+def test_inference_with_stationary():
+    records = mock_price_dataframe()
+    records = records.resample('us').ffill()
+    logging.info(f"Original records: {records}")
+
+    s, s_inv = transform.make_stationarizer("diff")
+    stationary, centralized = transform.to_stationary(
+        np.mean, s, records
+    )
+    logging.info(f"Stationarized records: {stationary}")
+
+    n_cutpoints = 11
+    discrete_stationary = transform.continuous_to_variable_level(
+        stationary,
+        n_cutpoints,
+    )
+
+    names = transform.get_names2strings("NYSE", "NASDAQ", "BATS")
+
+    nyse_dim = dimensions.VariableDimensions(names["NYSE"], n_cutpoints)
+    nasdaq_dim = dimensions.VariableDimensions(names["NASDAQ"], n_cutpoints)
+    bats_dim = dimensions.VariableDimensions(names["BATS"], n_cutpoints)
+
+    d_nn = dimensions.FactorDimensions(
+        nyse_dim, nasdaq_dim
+    )
+    d_nb = dimensions.FactorDimensions(
+        nasdaq_dim, bats_dim
+    )
+    d_bn = dimensions.FactorDimensions(
+        bats_dim, nyse_dim
+    )
+    factor_graph, losses_from_training = factor.DiscreteFactorGraph.learn(
+        (d_nn, d_nb, d_bn),
+        discrete_stationary.rename(columns=names)
+    )
