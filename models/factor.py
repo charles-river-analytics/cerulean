@@ -3,7 +3,7 @@ import abc
 import collections
 import datetime
 import logging
-from typing import Callable, Iterable, Optional, Union
+from typing import Callable, Iterable, Literal, Optional, Union
 
 import mypy
 import numpy as np
@@ -18,6 +18,33 @@ from . import (
     dimensions,
     transform
 )
+
+
+def _get_pairwise_constraint_table(
+    dim: tuple[int, int],
+    relation: Literal["==", "!=", "<", ">", "<=", ">="]
+) -> torch.Tensor:
+    if relation == "==":
+        the_tensor = torch.zeros(dim)
+        the_tensor[
+            range(len(the_tensor)),
+            range(len(the_tensor))
+        ] = torch.tensor(1.0)
+    elif relation == "!=":
+        the_tensor = torch.ones(dim)
+        the_tensor[
+            range(len(the_tensor)),
+            range(len(the_tensor))
+        ] = torch.tensor(0.0)
+    elif relation == "<":
+        the_tensor = torch.ones(dim).triu(diagonal=1,)
+    elif relation == ">":
+        the_tensor = torch.ones(dim).tril(diagonal=-1,)
+    elif relation == "<=":
+        the_tensor = torch.ones(dim).triu()
+    elif relation == ">=":
+        the_tensor = torch.ones(dim).tril()
+    return the_tensor
 
 
 def discrete_joint_conditioned(eq: str, *tensors: torch.Tensor):
@@ -341,6 +368,48 @@ class DiscreteFactor(FactorNode):
         )
 
 
+class ConstraintFactor(DiscreteFactor):
+
+    @classmethod
+    def random(
+        cls,
+        dim: dimensions.FactorDimensions
+    ):
+        the_fs = dim.get_variable_str()
+        the_dim = dim.get_dimensions()
+        the_table = torch.randint(0, 1 + 1, the_dim)
+        return cls(the_fs, the_dim, the_table)
+
+    @classmethod
+    def pairwise(
+        cls,
+        dim: dimensions.FactorDimensions,
+        relation: Literal["==", "!=", "<", ">", "<=", ">="]
+    ):
+        """
+        """
+        if len(dim) != 2:
+            raise ValueError(".pairwise(...) works only with exactly two variables!")
+        the_fs = dim.get_variable_str()
+        the_dim = dim.get_dimensions()
+        the_table = _get_pairwise_constraint_table(the_dim, relation)
+        return cls(the_fs, the_dim, the_table)
+
+    def __init__(
+        self,
+        fs: str,
+        dim: Union[torch.Size, tuple[int,...]],
+        table: torch.Tensor,
+    ):
+        # check that all entries in the table are zero or one
+        if not all(map(lambda x: (x == 0) | (x == 1), table.view((-1,)))):
+            raise ValueError("Construct ConstraintFactor with only {0,1} tensor.")
+        name = f"ConstraintFactor({fs})"
+        super().__init__(
+            name, fs, dim, table
+        )
+
+
 class FactorGraph(abc.ABC):
     """
     Abstract base class from which all factor graphs must inherit.
@@ -522,59 +591,3 @@ class DiscreteFactorGraph(FactorGraph):
             result_table.shape,
             result_table
         )
-
-
-# class GenericDiscreteFactorGraph(DiscreteFactorGraph):
-
-#     @classmethod
-#     def _next_id(cls):
-#         cls.count += 1
-#         return f"DiscreteFactorGraph{cls.count}"
-
-#     @classmethod
-#     def learn(
-#         cls,
-#         dimensions: Iterable[dimensions.FactorDimensions],
-#         data: pd.DataFrame
-#     ):
-#         """Learns parameters of factors in a factor graph from data.
-
-#         + `dimensions`: an iterable of `FactorDimensions`, each of which describes the variables
-#             related by that factor.
-#         + `data`: `pandas.DataFrame`. Each column must be equal length and correspond to observations
-#             of the variable given in the header of the column.
-#         """
-#         variables = [d.get_variables() for d in dimensions]
-#         dims = [d.get_dimensions() for d in dimensions]
-#         data = transform._df2od_torch(data, variables, dims)
-#         fs2dim = collections.OrderedDict((d.get_factor_spec() for d in dimensions))
-#         losses = mle_train(
-#             discrete_factor_model,
-#             (fs2dim,),
-#             dict(data=data),
-#         )
-#         factors = [
-#             DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, pyro.param(make_factor_name(fs)))
-#             for (fs, dim) in fs2dim.items()
-#         ]
-#         new_factor_graph = cls(*factors, ts=None)
-#         new_factor_graph._learned = True
-#         assert new_factor_graph.fs2dim == fs2dim
-#         return (new_factor_graph, losses)
-
-#     def __init__(
-#         self,
-#         *factors: DiscreteFactor,
-#         ts: Optional[datetime.datetime]=None
-#     ):
-#         self.ts = ts
-#         self.factors = collections.OrderedDict({
-#             f.fs: f for f in factors
-#         })
-#         self.id = type(self)._next_id()
-#         self.fs2dim = collections.OrderedDict({
-#             f.fs: f.dim for f in self.factors.values()
-#         })
-
-#         self._evidence_cache = list()
-#         self._learned = False

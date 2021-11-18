@@ -6,5 +6,6 @@ log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 markers = [
     "slow: marks tests as slow",
     "training: marks tests as involving a training step",
-    "scaling: marks tests as involving a scaling study"
+    "scaling: marks tests as involving a scaling study",
+    "constraint: marks tests as explicitly testing constraint capabilities"
 ]

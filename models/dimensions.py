@@ -19,6 +19,9 @@ class Dimensions:
             raise ValueError("Must pass at least one (var, dim) tuple.")
         self.variables = variables
 
+    def __len__(self,):
+        return len(self.variables)
+
     def get_variables(self,) -> tuple[str]:
         """
         Returns a tuple of variables associated with the Dimensions.
@@ -97,7 +100,7 @@ class DimensionsFactory:
         # actually register the variables and their dimensions
         factory("my variable", 10)  # has 10 cutpoints
         factory("my other variable", 29)  # has 29 cutpoints
-        
+
         # make some factor dimensions
         fd1 = factory(("my variable",))  # dimensions for factor of degree 1
         fd2 = factory(("my variable", "my other variable"))  # dimensions for factor of degree 2
