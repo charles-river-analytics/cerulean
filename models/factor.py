@@ -20,33 +20,6 @@ from . import (
 )
 
 
-def _get_pairwise_constraint_table(
-    dim: tuple[int, int],
-    relation: Literal["==", "!=", "<", ">", "<=", ">="]
-) -> torch.Tensor:
-    if relation == "==":
-        the_tensor = torch.zeros(dim)
-        the_tensor[
-            range(len(the_tensor)),
-            range(len(the_tensor))
-        ] = torch.tensor(1.0)
-    elif relation == "!=":
-        the_tensor = torch.ones(dim)
-        the_tensor[
-            range(len(the_tensor)),
-            range(len(the_tensor))
-        ] = torch.tensor(0.0)
-    elif relation == "<":
-        the_tensor = torch.ones(dim).triu(diagonal=1,)
-    elif relation == ">":
-        the_tensor = torch.ones(dim).tril(diagonal=-1,)
-    elif relation == "<=":
-        the_tensor = torch.ones(dim).triu()
-    elif relation == ">=":
-        the_tensor = torch.ones(dim).tril()
-    return the_tensor
-
-
 def discrete_joint_conditioned(eq: str, *tensors: torch.Tensor):
     """
     Computes the distribution :math:`p(V, E = e)` via (cached) variable elimination. 
@@ -365,48 +338,6 @@ class DiscreteFactor(FactorNode):
         psi_k /= psi_k.sum()
         return np.sum(
             -1.0 * psi_k * np.log2(psi_k)
-        )
-
-
-class ConstraintFactor(DiscreteFactor):
-
-    @classmethod
-    def random(
-        cls,
-        dim: dimensions.FactorDimensions
-    ):
-        the_fs = dim.get_variable_str()
-        the_dim = dim.get_dimensions()
-        the_table = torch.randint(0, 1 + 1, the_dim)
-        return cls(the_fs, the_dim, the_table)
-
-    @classmethod
-    def pairwise(
-        cls,
-        dim: dimensions.FactorDimensions,
-        relation: Literal["==", "!=", "<", ">", "<=", ">="]
-    ):
-        """
-        """
-        if len(dim) != 2:
-            raise ValueError(".pairwise(...) works only with exactly two variables!")
-        the_fs = dim.get_variable_str()
-        the_dim = dim.get_dimensions()
-        the_table = _get_pairwise_constraint_table(the_dim, relation)
-        return cls(the_fs, the_dim, the_table)
-
-    def __init__(
-        self,
-        fs: str,
-        dim: Union[torch.Size, tuple[int,...]],
-        table: torch.Tensor,
-    ):
-        # check that all entries in the table are zero or one
-        if not all(map(lambda x: (x == 0) | (x == 1), table.view((-1,)))):
-            raise ValueError("Construct ConstraintFactor with only {0,1} tensor.")
-        name = f"ConstraintFactor({fs})"
-        super().__init__(
-            name, fs, dim, table
         )
 
 

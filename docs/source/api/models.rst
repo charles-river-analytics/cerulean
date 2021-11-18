@@ -17,6 +17,14 @@ factor module
    :undoc-members:
    :show-inheritance:
 
+constraint module
+-----------------
+
+.. automodule:: models.constraint
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 transform module
 ----------------
 
