@@ -125,6 +125,13 @@ def test_inference_with_stationary():
         n_cutpoints,
     )
 
+    discrete_stationary_minmax = transform.continuous_to_variable_level(
+        stationary,
+        n_cutpoints,
+        -0.02,
+        0.02
+    )
+
     names = transform.get_names2strings("NYSE", "NASDAQ", "BATS")
 
     nyse_dim = dimensions.VariableDimensions(names["NYSE"], n_cutpoints)
