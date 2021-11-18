@@ -2,7 +2,7 @@
 
 ## Installation
 
-+ Create a conda environment (maybe named `proper-fm`)
++ `conda create --name proper-fm python=3.9`
 + `/opt/anaconda3/envs/proper-fm/bin/python -m pip install -r requirements.txt`
 
 ## Testing
