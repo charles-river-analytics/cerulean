@@ -22,13 +22,13 @@ class Dimensions:
     def __len__(self,):
         return len(self.variables)
 
-    def get_variables(self,) -> tuple[str]:
+    def get_variables(self,) -> tuple[str,...]:
         """
         Returns a tuple of variables associated with the Dimensions.
         """
         return tuple(v[0] for v in self.variables)
 
-    def get_dimensions(self,) -> tuple[int]:
+    def get_dimensions(self,) -> tuple[int,...]:
         """
         Returns a tuple of integers, each of which is the cardinality of one dimension
         of the support set.
