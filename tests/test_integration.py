@@ -177,3 +177,50 @@ def test_visualization_and_divergence():
         pred_pair = factor_graph.query(pair)
         entropy = pred_pair.entropy()
         logging.info(f"Computed {pair} entropy: {entropy} bits")
+
+
+def test_validation_statistics_bounds():
+    dimgen = models.dimensions.DimensionsFactory("var1", "var2")
+    d = 4
+    dimgen("var1", d)
+    dimgen("var2", d)
+    f1 = dimgen(("var1",))
+    f2 = dimgen(("var2",))
+
+    # 1d uniform factor
+    dist1 = models.factor.DiscreteFactor(
+        "dist1",
+        f1.get_variable_str(),
+        f1.get_dimensions(),
+        torch.ones((d,))
+    )
+    # another 1d uniform factor
+    dist2 = models.factor.DiscreteFactor(
+        "dist2",
+        f2.get_variable_str(),
+        f2.get_dimensions(),
+        torch.ones((d,))
+    )
+
+    # since distributions are equal, KLD = -H by definition
+    kld = dist1.kl_divergence(dist2)
+    entropy = dist1.entropy()
+    logging.info(f"KLD(d1||d2) = {kld}, while H(d1) = {entropy}")
+    assert kld == -1.0 * entropy
+
+    # more generally, D(p||q) = H(p, q) - H(p)
+    dist2.table[0] += torch.tensor(1.0)
+    logging.info(
+        f"Modified d2, now d1 = {dist1.table} and d2 = {dist2.table}"
+    )
+    kld_1_to_2 = dist1.kl_divergence(dist2)
+    entropy_1 = dist1.entropy()
+    # note kld is not symmetric
+    kld_2_to_1 = dist2.kl_divergence(dist1)
+    entropy_2 = dist2.entropy()
+
+    assert -1.0 * kld_1_to_2 >= entropy_1
+    assert -1.0 * kld_2_to_1 >= entropy_2
+    assert kld_1_to_2 != kld_2_to_1
+    logging.info(f"KLD(d1||d2) = {kld_1_to_2}")
+    logging.info(f"KLD(d2||d2) = {kld_2_to_1}")
