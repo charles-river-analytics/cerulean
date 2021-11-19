@@ -1,10 +1,10 @@
-models
+cerulean
 =============
 
 dimensions module
 -----------------
 
-.. automodule:: models.dimensions
+.. automodule:: cerulean.dimensions
    :members:
    :undoc-members:
    :show-inheritance:
@@ -12,7 +12,7 @@ dimensions module
 factor module
 -------------
 
-.. automodule:: models.factor
+.. automodule:: cerulean.factor
    :members:
    :undoc-members:
    :show-inheritance:
@@ -20,7 +20,7 @@ factor module
 constraint module
 -----------------
 
-.. automodule:: models.constraint
+.. automodule:: cerulean.constraint
    :members:
    :undoc-members:
    :show-inheritance:
@@ -28,7 +28,7 @@ constraint module
 transform module
 ----------------
 
-.. automodule:: models.transform
+.. automodule:: cerulean.transform
    :members:
    :undoc-members:
    :show-inheritance:
@@ -36,7 +36,7 @@ transform module
 visualization module
 --------------------
 
-.. automodule:: models.visualization
+.. automodule:: cerulean.visualization
    :members:
    :undoc-members:
    :show-inheritance:

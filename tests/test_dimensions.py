@@ -1,7 +1,7 @@
 
 import pytest
 
-from models import dimensions
+from cerulean import dimensions
 
 
 def test_dimension_create():

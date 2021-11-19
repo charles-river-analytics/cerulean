@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 import torch
 
-import models
+import cerulean
 
 
 def get_data():
@@ -26,16 +26,16 @@ def to_micro(t0, t1):
 @pytest.mark.slow
 @pytest.mark.training
 def test_snapshot():
-    a_dim = models.dimensions.VariableDimensions("a", 2)
-    b_dim = models.dimensions.VariableDimensions("b", 3)
-    c_dim = models.dimensions.VariableDimensions("c", 4)
+    a_dim = cerulean.dimensions.VariableDimensions("a", 2)
+    b_dim = cerulean.dimensions.VariableDimensions("b", 3)
+    c_dim = cerulean.dimensions.VariableDimensions("c", 4)
 
-    ab_dim = models.dimensions.FactorDimensions(a_dim, b_dim)
-    bc_dim = models.dimensions.FactorDimensions(b_dim, c_dim)
-    ca_dim = models.dimensions.FactorDimensions(c_dim, a_dim)
+    ab_dim = cerulean.dimensions.FactorDimensions(a_dim, b_dim)
+    bc_dim = cerulean.dimensions.FactorDimensions(b_dim, c_dim)
+    ca_dim = cerulean.dimensions.FactorDimensions(c_dim, a_dim)
 
     data = get_data()
-    old_fg, losses_from_training = models.factor.DiscreteFactorGraph.learn(
+    old_fg, losses_from_training = cerulean.factor.DiscreteFactorGraph.learn(
         (ab_dim, bc_dim, ca_dim),
         data
     )
@@ -61,16 +61,16 @@ def test_snapshot():
 @pytest.mark.training
 def test_integration_1():
     #fs2dim = get_fs2dim(dims())
-    a_dim = models.dimensions.VariableDimensions("a", 2)
-    b_dim = models.dimensions.VariableDimensions("b", 3)
-    c_dim = models.dimensions.VariableDimensions("c", 4)
+    a_dim = cerulean.dimensions.VariableDimensions("a", 2)
+    b_dim = cerulean.dimensions.VariableDimensions("b", 3)
+    c_dim = cerulean.dimensions.VariableDimensions("c", 4)
 
-    ab_dim = models.dimensions.FactorDimensions(a_dim, b_dim)
-    bc_dim = models.dimensions.FactorDimensions(b_dim, c_dim)
-    ca_dim = models.dimensions.FactorDimensions(c_dim, a_dim)
+    ab_dim = cerulean.dimensions.FactorDimensions(a_dim, b_dim)
+    bc_dim = cerulean.dimensions.FactorDimensions(b_dim, c_dim)
+    ca_dim = cerulean.dimensions.FactorDimensions(c_dim, a_dim)
 
     data = get_data()
-    factor_graph, losses_from_training = models.factor.DiscreteFactorGraph.learn(
+    factor_graph, losses_from_training = cerulean.factor.DiscreteFactorGraph.learn(
         (ab_dim, bc_dim, ca_dim),
         data
     )
@@ -126,20 +126,20 @@ def test_integration_1():
 @pytest.mark.slow
 @pytest.mark.training
 def test_visualization_and_divergence():
-    a_dim = models.dimensions.VariableDimensions("a", 2)
-    b_dim = models.dimensions.VariableDimensions("b", 3)
-    c_dim = models.dimensions.VariableDimensions("c", 4)
+    a_dim = cerulean.dimensions.VariableDimensions("a", 2)
+    b_dim = cerulean.dimensions.VariableDimensions("b", 3)
+    c_dim = cerulean.dimensions.VariableDimensions("c", 4)
 
-    ab_dim = models.dimensions.FactorDimensions(a_dim, b_dim)
-    bc_dim = models.dimensions.FactorDimensions(b_dim, c_dim)
-    ca_dim = models.dimensions.FactorDimensions(c_dim, a_dim)
+    ab_dim = cerulean.dimensions.FactorDimensions(a_dim, b_dim)
+    bc_dim = cerulean.dimensions.FactorDimensions(b_dim, c_dim)
+    ca_dim = cerulean.dimensions.FactorDimensions(c_dim, a_dim)
 
     data = pd.DataFrame({
         "a": [0, 0, 1, 0, 1],  # / 2
         "b": [0, 1, 2, 0, 1],  # / 3
         "c": [1, 0, 3, 2, 1]   # / 4
     })
-    factor_graph, losses_from_training = models.factor.DiscreteFactorGraph.learn(
+    factor_graph, losses_from_training = cerulean.factor.DiscreteFactorGraph.learn(
         (ab_dim, bc_dim, ca_dim),
         data
     )
@@ -150,7 +150,7 @@ def test_visualization_and_divergence():
     )
 
     for (variable, prob) in zip(data.columns, true_probs):
-        models.visualization.probability_compare(
+        cerulean.visualization.probability_compare(
             factor_graph,
             variable,
             prob,
@@ -168,7 +168,7 @@ def test_visualization_and_divergence():
             dropna=False
         )
         prob_pair = prob_pair.values / prob_pair.values.sum()
-        models.visualization.probability_compare(
+        cerulean.visualization.probability_compare(
             factor_graph,
             pair,
             prob_pair
@@ -180,7 +180,7 @@ def test_visualization_and_divergence():
 
 
 def test_validation_statistics_bounds():
-    dimgen = models.dimensions.DimensionsFactory("var1", "var2")
+    dimgen = cerulean.dimensions.DimensionsFactory("var1", "var2")
     d = 4
     dimgen("var1", d)
     dimgen("var2", d)
@@ -188,14 +188,14 @@ def test_validation_statistics_bounds():
     f2 = dimgen(("var2",))
 
     # 1d uniform factor
-    dist1 = models.factor.DiscreteFactor(
+    dist1 = cerulean.factor.DiscreteFactor(
         "dist1",
         f1.get_variable_str(),
         f1.get_dimensions(),
         torch.ones((d,))
     )
     # another 1d uniform factor
-    dist2 = models.factor.DiscreteFactor(
+    dist2 = cerulean.factor.DiscreteFactor(
         "dist2",
         f2.get_variable_str(),
         f2.get_dimensions(),

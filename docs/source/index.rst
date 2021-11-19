@@ -1,5 +1,5 @@
-Welcome to PROP's model documentation!
-======================================
+Welcome to cerulean's model documentation.
+==========================================
 
 .. toctree::
    :maxdepth: 4
@@ -8,11 +8,7 @@ Welcome to PROP's model documentation!
    ./usage/installation
    ./usage/quickstart
    ./usage/documentation
-   ./api/models
-
-
-Architecture
-============
+   ./api/cerulean
 
 Indices and tables
 ==================

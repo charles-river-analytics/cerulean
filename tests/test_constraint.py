@@ -3,7 +3,7 @@ import logging
 
 import pytest
 import torch
-from models import (
+from cerulean import (
     constraint,
     dimensions,
     factor,

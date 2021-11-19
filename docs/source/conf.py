@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'PROP.models'
+project = 'cerulean'
 copyright = '2021, Charles River Analytics, Inc.'
 author = 'David Dewhurst, Joseph Campolongo, Mike Reposa'
 
