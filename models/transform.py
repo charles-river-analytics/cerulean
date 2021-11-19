@@ -1,9 +1,10 @@
 import collections
 import datetime
-from typing import Callable, Iterable, Literal
+from typing import Callable, Iterable, Literal, Optional
 
 import mypy
 import numpy as np
+from opt_einsum.parser import get_symbol
 import pandas as pd
 import torch
 
@@ -117,3 +118,83 @@ def to_stationary(
         stationarizer(records, centralized_records),
         centralized_records
     )
+
+
+def _continuous_to_auto_variable_level(
+    continuous_df: pd.DataFrame,
+    n_bins: int
+) -> pd.DataFrame:
+    """
+    Computes a discretization inferring min and max from data.
+    """
+    to_df = dict()
+    for col in continuous_df.columns:
+        # TODO: use the freqs for anything?
+        the_freqs, the_bins = np.histogram(continuous_df[col], bins=n_bins)
+        the_ixs = np.digitize(continuous_df[col].values, the_bins, right=True)
+        to_df[col] = the_ixs
+    return pd.DataFrame(to_df)
+
+
+def _continuous_to_specific_variable_level(
+    continuous_df: pd.DataFrame,
+    n_bins: int,
+    the_min: float,
+    the_max: float
+) -> pd.DataFrame:
+    """
+    Computes a discretization with a user-specified min and max.
+    """
+    to_df = dict()
+    for col in continuous_df.columns:
+        # TODO: use the freqs for anything?
+        the_freqs, the_bins = np.histogram(
+            continuous_df[col],
+            bins=n_bins,
+            range=(the_min, the_max)
+        )
+        the_ixs = np.digitize(continuous_df[col].values, the_bins, right=True)
+        to_df[col] = the_ixs
+    return pd.DataFrame(to_df)
+
+
+def continuous_to_variable_level(
+    continuous_df: pd.DataFrame,
+    n_cutpoints: int,
+    the_min: Optional[float]=None,
+    the_max: Optional[float]=None,
+) -> pd.DataFrame:
+    """
+    Discretizes a collection of continuous rvs (represented via samples in 
+    `pd.DataFrame`) into a collection of discrete rvs each of which has support 
+    on :math:`\{0,1,2...,D - 1\}`, where :math:`D` `=n_cutpoints`. 
+    
+    If `the_min` and `the_max` aren't passed, min and max are inferred from 
+    the data to be the min and max respectively of the sample. If you do not have 
+    reason to believe that your sample contains something close to the actual min 
+    and max possible of the DGP, you should probably pass an explicit min and max. 
+
+    TODO: specify different number of cutpoints for each variable?
+    """
+    if (the_min is None) & (the_max is not None) | (the_min is not None) & (the_max is None):
+        raise ValueError("Both the_min and the_max must be None, or neither.")
+    n_bins = max(n_cutpoints - 1, 2)
+    if the_max is None:
+        return _continuous_to_auto_variable_level(continuous_df, n_bins)
+    else:
+        return _continuous_to_specific_variable_level(
+            continuous_df,
+            n_bins,
+            the_min,
+            the_max
+        )
+
+
+def get_names2strings(*names: str) -> dict[str, str]:
+    """
+    Maps variable names (which may be arbitrary strings) to unique unicode
+    strings via `opt_einsum.parser`.
+    """
+    return {
+        name: get_symbol(i) for (i, name) in enumerate(names)
+    }

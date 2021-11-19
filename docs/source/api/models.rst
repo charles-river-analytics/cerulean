@@ -24,3 +24,11 @@ transform module
    :members:
    :undoc-members:
    :show-inheritance:
+
+visualization module
+--------------------
+
+.. automodule:: models.visualization
+   :members:
+   :undoc-members:
+   :show-inheritance:

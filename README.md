@@ -2,7 +2,7 @@
 
 ## Installation
 
-+ Create a conda environment (maybe named `proper-fm`)
++ `conda create --name proper-fm python=3.9`
 + `/opt/anaconda3/envs/proper-fm/bin/python -m pip install -r requirements.txt`
 
 ## Testing
@@ -16,4 +16,5 @@ This project uses `pytest`.
 This project uses Sphinx to build its documentation. To build the documentation:
 
 + `cd docs`
-+ `make html` (or similar command to make another form of the documentation)
++ `make html` (to build documentation as html)
++ `make latexpdf` (to build documentation as pdf)

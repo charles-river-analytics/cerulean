@@ -3,6 +3,7 @@ import datetime
 import logging
 import time
 
+import numpy as np
 import pandas as pd
 import pytest
 import torch
@@ -116,3 +117,57 @@ def test_integration_1():
     logging.info(f"Factor graph shapes: {factor_graph.get_shapes()}")
     logging.info(f"After posting b and c evidence, p(a) = {p_a_cond_bc}")
     logging.info(f"Took {to_micro(t0, t1)}us to post c evidence and compute p(a|b,c)")
+
+
+def test_visualization_and_divergence():
+    a_dim = models.dimensions.VariableDimensions("a", 2)
+    b_dim = models.dimensions.VariableDimensions("b", 3)
+    c_dim = models.dimensions.VariableDimensions("c", 4)
+
+    ab_dim = models.dimensions.FactorDimensions(a_dim, b_dim)
+    bc_dim = models.dimensions.FactorDimensions(b_dim, c_dim)
+    ca_dim = models.dimensions.FactorDimensions(c_dim, a_dim)
+
+    data = pd.DataFrame({
+        "a": [0, 0, 1, 0, 1],  # / 2
+        "b": [0, 1, 2, 0, 1],  # / 3
+        "c": [1, 0, 3, 2, 1]   # / 4
+    })
+    factor_graph, losses_from_training = models.factor.DiscreteFactorGraph.learn(
+        (ab_dim, bc_dim, ca_dim),
+        data
+    )
+    true_probs = (
+        np.array([3.0 / 5, 2.0 / 5]),
+        np.array([2.0 / 5, 2.0 / 5, 1.0 / 5]),
+        np.array([1.0 / 5, 2.0 / 5, 1.0 / 5, 1.0 / 5])
+    )
+
+    for (variable, prob) in zip(data.columns, true_probs):
+        models.visualization.probability_compare(
+            factor_graph,
+            variable,
+            prob,
+        )
+
+    # demonstrate kl divergence calculations
+    for pair, dim in zip(["ab", "bc", "ca"], [(2, 3), (3, 4), (4, 2)]):
+
+        val_1, val_2 = pair
+        d1, d2 = dim
+
+        prob_pair = pd.crosstab(
+            pd.Categorical(data[val_1].values, categories=list(range(d1))),
+            pd.Categorical(data[val_2].values, categories=list(range(d2))),
+            dropna=False
+        )
+        prob_pair = prob_pair.values / prob_pair.values.sum()
+        models.visualization.probability_compare(
+            factor_graph,
+            pair,
+            prob_pair
+        )
+
+        pred_pair = factor_graph.query(pair)
+        entropy = pred_pair.entropy()
+        logging.info(f"Computed {pair} entropy: {entropy} bits")

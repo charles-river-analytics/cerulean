@@ -1,5 +1,6 @@
 
 import mypy
+from typing import Tuple
 
 
 class Dimensions:
@@ -10,16 +11,18 @@ class Dimensions:
     `FactorDimensions`. 
     """
 
-    def __init__(self, *variables: tuple[str, int]):
+    def __init__(self, *variables: Tuple[str, int]):
+        if len(variables) < 1:
+            raise ValueError("Must pass at least one (var, dim) tuple.")
         self.variables = variables
 
-    def get_variables(self,) -> tuple[str]:
+    def get_variables(self,) -> Tuple[str]:
         """
         Returns a tuple of variables associated with the Dimensions.
         """
         return tuple(v[0] for v in self.variables)
 
-    def get_dimensions(self,) -> tuple[int]:
+    def get_dimensions(self,) -> Tuple[int]:
         """
         Returns a tuple of integers, each of which is the cardinality of one dimension
         of the support set.
@@ -34,7 +37,7 @@ class Dimensions:
         """
         return "".join(self.get_variables())
 
-    def get_factor_spec(self,) -> tuple[str,tuple[int,...]]:
+    def get_factor_spec(self,) -> Tuple[str,Tuple[int,...]]:
         """
         Returns a representation of the Dimensions that's useful for the functional
         factor graph interpretation. 

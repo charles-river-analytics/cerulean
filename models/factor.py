@@ -1,51 +1,3 @@
-"""
-Factor graphs
-*************
-
-This module contains functions and classes related to factor graphs. Factor graphs are undirected
-bipartite graphs that relate variable nodes, which are quantities of interest such as the 
-genre into which a movie may be classified or the price of a limit bid order, to factor
-nodes, which are non-negative functions that relate values of variables to one another.
-If a factor graph has :math:`N` variables :math:`x_1,...,x_N`, the factor graph can 
-be expressed as
-
-.. math:: p(x_1,...,x_N) = \\frac{1}{Z(\\theta)} 
-    \prod_{\\mathrm{cl}}\psi_{\mathrm{cl}}(x_{\mathrm{cl}}; \\theta)
-    :label: fg-eq
-
-The notation :math:`x_\mathrm{cl}` denotes a clique of variables that are related by the factor
-:math:`\psi_\mathrm{cl}`. For example, a factor graph that relates all pairs of nodes would have
-joint density given by
-
-.. math:: p(x_1,...,x_N) = \\frac{1}{Z(\\theta)} 
-    \prod_{1\leq i < j \leq N}\psi_{i,j}(x_i, x_j; \\theta)
-
-The vector :math:`\\theta` denotes the vector of parameters for the entire graph (note that
-"vector" in this context can be interpreted as "all tensors of parameters"; you could create a
-vector from all tensors of parameters by `squeeze`-ing each of them and `concat`-enating them 
-together). The value of a factor is given by
-:math:`\psi_{\mathrm{cl}}(x_{\mathrm{cl}}; \\theta) = \\theta_{x_\mathrm{cl}}`, the corresponding
-element in the :math:`|\mathrm{cl}|` dimensional tensor of values.
-
-Values of a factor denote how likely it is that variable elements co-occur. This module is concerned
-with two factor interpretations: probability factors, which denote un-normalized probablility that
-variable elements co-occur; and constraint factors, which are :math:`\{0,1\}`-valued tensors that
-denote whether it is possible or not for variable elements to co-occur.
-The number :math:`Z(\\theta)` in Eq. :eq:`fg-eq` is a normalization constant. In the case of
-a factor graph containing only constraint nodes its value is immaterial (since a configuration of nodes
-is valid iff :math:`p(x_1,...,x_N)` is nonzero), but in the case of a factor graph representing a 
-probability mass function (pmf) it is the normalizer, or the number that makes :math:`p(x_1,...,x_N)`
-a valid pmf. In this case, the partition function is equal to
-
-.. math:: Z(\\theta) = \sum_{x_1,...,x_N}
-    \prod_{\\mathrm{cl}}\psi_{\mathrm{cl}}(x_{\mathrm{cl}}; \\theta)
-
-A naive computation of this quantity is exponential in the number of variables in the factor graph.
-Exploiting the structure of the factor graph during computation lowers the complexity to only
-exponential in the size of the highest-degree factor, which may be a significant reduction in complexity
-(e.g., for a factor graph with thousands of variables but only pairwise relationships between variables).
-
-"""
 
 import abc
 import collections
@@ -54,11 +6,12 @@ import logging
 from typing import Callable, Iterable, Optional, Union
 
 import mypy
+import numpy as np
+import opt_einsum
 import pandas as pd
 import pyro
 import pyro.distributions as dist
 import pyro.distributions.constraints as constraints
-from pyro.ops.contract import einsum
 import torch
 
 from . import dimensions
@@ -69,14 +22,11 @@ def discrete_joint_conditioned(eq: str, *tensors: torch.Tensor):
     """
     Computes the distribution :math:`p(V, E = e)` via (cached) variable elimination. 
 
-    Wrapper around `pyro.ops.contract.einsum` that does not enforce normalization to 
-    a pmf (since that occurs in `discrete_marginal`).
-
     TODO: ensure that we are using the most optimal caching strategy internally. This 
     may involve actually using the underlying opt_einsum function call instead so that we can 
     specify what tensors remain constant and other optimizations.
     """
-    return einsum(eq, *tensors, modulo_total=True)[0]
+    return opt_einsum.contract(eq, *tensors)
 
 
 def discrete_marginal(eq: str, *tensors: torch.Tensor):
@@ -335,6 +285,59 @@ class DiscreteFactor(FactorNode):
             logging.debug(f"Variable {var} not in DiscreteFactor {self.name}")
             return self
 
+    def kl_divergence(self, other: Union["DiscreteFactor", np.ndarray]) -> float:
+        """
+        Compute the Kullback-Leibler (KL) divergence between this factor and another.
+
+        The KL divergence between this factor :math:`\psi` and another (normalized)
+        factor :math:`\phi` is equal to
+
+        .. math:: \mathrm{D}(\psi||\phi) = \sum_x \\frac{\psi(x)}{Z_\psi} 
+            \left[ \log \\frac{\psi(x)}{Z_\psi} - \log \\frac{\phi(x)}{Z_\phi} \\right].
+
+        The numbers :math:`Z` are the partition functions that convert the factors into proper
+        probability distributions. Note that the complexity of this method is exponential in the 
+        degree of the factor(s). NOTE: The logarithm is taken in base 2; the result has units of bits.
+        """
+        if type(other) == np.ndarray:
+            if tuple(other.shape) != tuple(self.table.shape):
+                raise ValueError(
+                    f"Mismatched sizes between {self} table and ndarray of shape {other.shape}!"
+                )
+            psi_k = self.table.numpy().flatten()
+            phi_k = other.flatten()
+        else:
+            if tuple(self.table.shape) != tuple(other.table.shape):
+                raise ValueError(
+                    f"Mismatched supports between {self} and {other}!"
+                )
+            psi_k = self.table.numpy().flatten()
+            phi_k = other.table.numpy().flatten()
+
+        psi_k /= psi_k.sum()
+        phi_k /= psi_k.sum()
+        return np.sum(
+            psi_k * (np.log2(psi_k) - np.log2(phi_k))
+        )
+
+    def entropy(self,) -> float:
+        """
+        Compute this factor's entropy.
+
+        The entropy for the factor :math:`\psi` is equal to
+
+        .. math:: \mathrm{H}(\psi) = -\sum_x \\frac{\psi(x)}{Z_\psi} \log \\frac{\psi(x)}{Z_\psi}.
+
+        The number :math:`Z_\psi` is the partition function that converts the factors into proper
+        probability distributions. Note that the complexity of this method is exponential in the 
+        degree of the factor. NOTE: The logarithm is taken in base 2; the result has units of bits.
+        """
+        psi_k = self.table.numpy().flatten()
+        psi_k /= psi_k.sum()
+        return np.sum(
+            -1.0 * psi_k * np.log2(psi_k)
+        )
+
 
 class FactorGraph(abc.ABC):
     """
@@ -413,6 +416,7 @@ class DiscreteFactorGraph(FactorGraph):
             for (fs, dim) in fs2dim.items()
         ]
         new_factor_graph = cls(*factors, ts=None)
+        new_factor_graph._learned = True
         assert new_factor_graph.fs2dim == fs2dim
         return (new_factor_graph, losses)
 
@@ -431,6 +435,7 @@ class DiscreteFactorGraph(FactorGraph):
         })
 
         self._evidence_cache = list()
+        self._learned = False
 
     def snapshot(self,):
         """
@@ -507,7 +512,7 @@ class DiscreteFactorGraph(FactorGraph):
         with torch.no_grad():
             result_table = discrete_marginal(
                 f"{network_string}->{variables}",
-                *(DiscreteFactor.table for DiscreteFactor in self.factors.values())
+                *(DiscreteFactor.table for DiscreteFactor in self.factors.values()),
             )
         return DiscreteFactor(
             f"{self.id}-query={variables}",
