@@ -34,6 +34,32 @@ def test_constraint_create():
 
 
 @pytest.mark.constraint
+def test_all_eq_and_not_eq():
+    d1, d2, d3 = 2, 3, 4
+    dimgen = dimensions.DimensionsFactory("a", "b", "c")
+    dimgen("a", d1)
+    dimgen("b", d2)
+    dimgen("c", d3)
+
+    all_diff_factors = constraint.all_different(
+        *(dimgen.get_variable(var) for var in ["a", "b", "c"])
+    )
+    all_diff_graph = factor.DiscreteFactorGraph(*all_diff_factors)
+    all_eq_factors = constraint.all_equal(
+        *(dimgen.get_variable(var) for var in ["a", "b", "c"])
+    )
+    all_eq_graph = factor.DiscreteFactorGraph(*all_eq_factors)
+    # actually compute all feasible worlds -- this operation has high complexity
+    # and we wouldn't do this on larger problems
+    all_diff_worlds = all_diff_graph.query("abc")
+    all_diff_worlds = constraint.enumerate_feasible(all_diff_worlds)
+    logging.info(f"All diff worlds:\n{all_diff_worlds}")
+    all_eq_worlds = all_eq_graph.query("abc")
+    all_eq_worlds = constraint.enumerate_feasible(all_eq_worlds)
+    logging.info(f"All eq worlds:\n{all_eq_worlds}")
+
+
+@pytest.mark.constraint
 def test_pairwise_constraint_create():
     d1, d2 = 3, 3  # minimally interesting
     dimgen = dimensions.DimensionsFactory("var1", "var2")

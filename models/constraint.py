@@ -1,4 +1,5 @@
 
+import itertools
 from typing import Literal, Union
 
 import mypy
@@ -11,6 +12,9 @@ def _get_pairwise_constraint_table(
     dim: tuple[int, int],
     relation: Literal["==", "!=", "<", ">", "<=", ">="]
 ) -> torch.Tensor:
+    """
+    Create tensor representing the pairwise relation constraint.
+    """
     if relation == "==":
         the_tensor = torch.zeros(dim)
         the_tensor[
@@ -35,6 +39,10 @@ def _get_pairwise_constraint_table(
 
 
 def _to_constraint_value(x: torch.Tensor) -> torch.Tensor:
+    """
+    Turns the :math:`[0, \infty)`-valued tensor into a 
+    :math:`\{0, 1\}`-valued tensor.
+    """
     return torch.where(
         x > torch.tensor(0.0),
         torch.tensor(1),
@@ -124,3 +132,43 @@ class ConstraintFactor(factor.DiscreteFactor):
         super().__init__(
             name, fs, dim, table
         )
+
+
+def all_different(
+    *variables: dimensions.VariableDimensions
+) -> tuple[ConstraintFactor,...]:
+    """
+    Enforces the constraint that values of all passed variables must be different.
+
+    If :math:`N \geq 2` is the number of variables for which the constraint must hold,
+    this function returns a tuple of :math:`N(N - 1)/2` `ConstraintFactor`s.
+    """
+    return (
+        ConstraintFactor.pairwise(dimensions.FactorDimensions(x, y), "!=")
+        for (x, y) in itertools.combinations(variables, 2)
+    )
+
+
+def all_equal(
+    *variables: dimensions.VariableDimensions
+) -> tuple[ConstraintFactor,...]:
+    """
+    Enforces the constraint that values of all passed variables must be equal.
+
+    If :math:`N \geq 2` is the number of variables for which the constraint must hold,
+    this function returns a tuple of :math:`N(N - 1)/2` `ConstraintFactor`s.
+    """
+    return (
+        ConstraintFactor.pairwise(dimensions.FactorDimensions(x, y), "==")
+        for (x, y) in itertools.combinations(variables, 2)
+    )
+
+
+def enumerate_feasible(f: ConstraintFactor) -> torch.Tensor:
+    """
+    Returns a tensor of (marginal) feasible allocations. The interpretation
+    of this tensor depends on the query that was originally passed to 
+    the factor graph.
+    """
+    return torch.nonzero(_to_constraint_value(f.table))
+    
