@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 import torch
 
-from models import dimensions, factor, transform
+from cerulean import dimensions, factor, transform
 
 
 def mock_train_data_dataframe():

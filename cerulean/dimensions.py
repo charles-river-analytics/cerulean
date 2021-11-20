@@ -29,7 +29,7 @@ class Dimensions:
         """
         return tuple(v[0] for v in self.variables)
 
-    def get_dimensions(self,) -> Tuple[int]:
+    def get_dimensions(self,) -> tuple[int,...]:
         """
         Returns a tuple of integers, each of which is the cardinality of one dimension
         of the support set.
