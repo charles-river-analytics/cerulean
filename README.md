@@ -1,7 +1,7 @@
 # cerulean
 
-`cerulean` is a library for learning, exact inference, and constraint satisfaction using factor graphs. 
-It is developed as part of the PROPER-FM program.
+`cerulean` is a library for learning, exact inference, and constraint satisfaction using discrete factor graphs. 
+It is developed as part of the PROPER-FM effort under DARPA I2O ECoSystemic.
 
 ## Installation
 
@@ -15,10 +15,8 @@ To install as part of another project:
 + `pip install -e your/cerulean/dir`
 
 ## Testing
-This project uses `pytest`. 
-
-+  In the top-level directory, run `/opt/anaconda3/envs/proper-fm/bin/python -m pytest --cov=cerulean` 
-    to execute all tests and see statistics of test coverage.
+This project uses `pytest`. In the top-level directory, run `/opt/anaconda3/envs/proper-fm/bin/python -m pytest --cov=cerulean` 
+to execute all tests and see statistics of test coverage.
 
 ## Documentation
 
@@ -28,10 +26,15 @@ This project uses Sphinx to build its documentation. To build the documentation:
 + `make html` (to build documentation as html)
 + `make latexpdf` (to build documentation as pdf)
 
+## Examples
+
+In order to run the examples, you have to install `cerulean` as a python package. To do that, just navigate to the directory in which 
+it's located and `/opt/anaconda3/envs/proper-fm/bin/python -m pip install -e .`.
+
 ## Acknowledgements and other information
 
-We are grateful for funding from DARPA under the ECoSystemic program.
+We are grateful for funding from DARPA under contract HR00112290006.
 
 Copyright Charles River Analytics Inc., David Rushing Dewhurst, Joseph Campolongo, and Mike Reposa, 2021 - present.
 All rights reserved.
-This library is *not* to be used outside Charles River Analytics without authorization from DM VP or higher authority.
+This library is *not* to be used outside Charles River Analytics or DARPA without authorization from DARPA PM or higher authority.
