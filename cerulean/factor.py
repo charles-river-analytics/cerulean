@@ -111,6 +111,7 @@ def mle_train(
     model_kwargs: dict,
     num_iterations: int=1000,
     lr: float=0.01,
+    train_options: Optional[dict]=None,
 ) -> torch.Tensor:
     """Trains the parameters of an MLE model. 
     
@@ -126,18 +127,25 @@ def mle_train(
     to specify what optimizers they want to use and b) experiment with choices of optimizer on real problems to 
     see if we can find heuristics on which ones are better choices conditioned on context. 
     """
+    opt_str = train_options.get("opt", "Adam")
+    opt_cls = getattr(pyro.optim, opt_str)
     guide = lambda *args, **kwargs: None
-    opt = pyro.optim.Adam(dict(lr=lr))
+
+    lr = train_options.get("lr", lr)
+    opt = opt_cls(dict(lr=lr))
     loss = pyro.infer.Trace_ELBO()
     svi = pyro.infer.SVI(model, guide, opt, loss=loss)
     
     pyro.clear_param_store()
     losses = torch.empty((num_iterations,))
+
+    verbosity = train_options.get("verbosity", 100)
+    num_iterations = train_options.get("num_iterations", num_iterations)
     
     for j in range(num_iterations):
         loss = svi.step(*model_args, **model_kwargs)
-        if j % 100 == 0:
-            logging.info(f"On iteration {j}, -ELBO = {loss}")
+        if j % verbosity == 0:
+            logging.info(f"On iteration {j}, -log p(x) = {loss}")
         losses[j] = loss
     return losses
 
@@ -395,7 +403,8 @@ class DiscreteFactorGraph(FactorGraph):
     def learn(
         cls,
         dimensions: Iterable[dimensions.FactorDimensions],
-        data: pd.DataFrame
+        data: pd.DataFrame,
+        train_options: Optional[dict]=None,
     ):
         """Learns parameters of factors in a factor graph from data.
 
@@ -412,6 +421,7 @@ class DiscreteFactorGraph(FactorGraph):
             discrete_factor_model,
             (fs2dim,),
             dict(data=data),
+            train_options=train_options,
         )
         factors = [
             DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, pyro.param(make_factor_name(fs)))
