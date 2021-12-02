@@ -111,7 +111,7 @@ def mle_train(
     model_kwargs: dict,
     num_iterations: int=1000,
     lr: float=0.01,
-    train_options: Optional[dict]=None,
+    train_options: dict=dict(),
 ) -> torch.Tensor:
     """Trains the parameters of an MLE model. 
     
@@ -127,6 +127,8 @@ def mle_train(
     to specify what optimizers they want to use and b) experiment with choices of optimizer on real problems to 
     see if we can find heuristics on which ones are better choices conditioned on context. 
     """
+    if train_options is None:
+        train_options = dict()
     opt_str = train_options.get("opt", "Adam")
     opt_cls = getattr(pyro.optim, opt_str)
     guide = lambda *args, **kwargs: None
