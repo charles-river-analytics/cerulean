@@ -45,33 +45,24 @@ def discrete_marginal(eq: str, *tensors: torch.Tensor):
     return (unscaled / torch.sum(unscaled))
 
 
-def make_factor_name(fs: str):
+def make_factor_name(fs: str, prefix: str="f"):
     """
     Makes a factor name from a dimension specification string. 
-    
-    NOTE: right now this name is *not* unique. 
-    
-    TODO: make this name unique. 
     """
-    return f"f_{fs}"
+    return f"{prefix}_{fs}"
 
 
 def discrete_factor_model(
     fs2dim: collections.OrderedDict[str,tuple[int,...]],
     data: Optional[collections.OrderedDict[str,torch.Tensor]]=None,
-    query_var: Optional[str]=None
+    query_var: Optional[str]=None,
+    factor_name_prefix: str="f",
 ) -> Optional[torch.Tensor]:
     """A Pyro model corresponding to a discrete factor graph. This model supports both MLE parameter
     learning and inference.
 
     This function takes a `collections.OrderedDict` of {dimension name string: dimension size tuple}, e.g., 
-    {"ab": (2, 3), "bc": (3, 4)}. 
-    
-    NOTE: this functionality is suboptimal because it does not allow for 
-    multiple factors that relate the same dimensions (e.g., one that maps probabilities and another that 
-    maps constraints). 
-    
-    TODO: this must be fixed. 
+    {"ab": (2, 3), "bc": (3, 4)}.  
 
     If `data` is not None, then this function scores the observed data against the current values of the factors
     using Pyro machiner. 
@@ -86,7 +77,7 @@ def discrete_factor_model(
     factors = collections.OrderedDict()
     for fs, dim in fs2dim.items():
         factors[fs] = pyro.param(
-            make_factor_name(fs),
+            make_factor_name(fs, prefix=factor_name_prefix,),
             torch.ones(dim),
             constraint=constraints.positive
         )
@@ -111,6 +102,7 @@ def mle_train(
     model_kwargs: dict,
     num_iterations: int=1000,
     lr: float=0.01,
+    train_options: dict=dict(),
 ) -> torch.Tensor:
     """Trains the parameters of an MLE model. 
     
@@ -126,18 +118,27 @@ def mle_train(
     to specify what optimizers they want to use and b) experiment with choices of optimizer on real problems to 
     see if we can find heuristics on which ones are better choices conditioned on context. 
     """
+    if train_options is None:
+        train_options = dict()
+    opt_str = train_options.get("opt", "Adam")
+    opt_cls = getattr(pyro.optim, opt_str)
     guide = lambda *args, **kwargs: None
-    opt = pyro.optim.Adam(dict(lr=lr))
+
+    lr = train_options.get("lr", lr)
+    opt = opt_cls(dict(lr=lr))
     loss = pyro.infer.Trace_ELBO()
     svi = pyro.infer.SVI(model, guide, opt, loss=loss)
     
     pyro.clear_param_store()
     losses = torch.empty((num_iterations,))
+
+    verbosity = train_options.get("verbosity", 100)
+    num_iterations = train_options.get("num_iterations", num_iterations)
     
     for j in range(num_iterations):
         loss = svi.step(*model_args, **model_kwargs)
-        if j % 100 == 0:
-            logging.info(f"On iteration {j}, -ELBO = {loss}")
+        if j % verbosity == 0:
+            logging.info(f"On iteration {j}, -log p(x) = {loss}")
         losses[j] = loss
     return losses
 
@@ -182,6 +183,7 @@ class DiscreteFactor(FactorNode):
         fs: str,
         dim: Union[torch.Size, tuple[int,...]],
         table: Optional[torch.Tensor]=None,
+        factor_name_prefix: str="f",
     ):
         """
         A `DiscreteFactor` takes parameters:
@@ -209,6 +211,7 @@ class DiscreteFactor(FactorNode):
         self.table = table
         self.shape = None if self.table is None else self.table.shape
 
+        self._factor_name_prefix = factor_name_prefix
         self._variables = [var for var in self.fs]
         self._variables_to_axis = collections.OrderedDict({
             var: i for (i, var) in enumerate(self._variables)
@@ -248,7 +251,7 @@ class DiscreteFactor(FactorNode):
     def get_factor(self,):
         """Returns the factor as stored in Pyro's `param_store`.
         """
-        return pyro.param(make_factor_name(self.fs))
+        return pyro.param(make_factor_name(self.fs, prefix=self._factor_name_prefix))
     
     def _post_evidence(self, var: str, level: int):
         """Posts evidence to the factor.
@@ -395,7 +398,8 @@ class DiscreteFactorGraph(FactorGraph):
     def learn(
         cls,
         dimensions: Iterable[dimensions.FactorDimensions],
-        data: pd.DataFrame
+        data: pd.DataFrame,
+        train_options: Optional[dict]=None,
     ):
         """Learns parameters of factors in a factor graph from data.
 
@@ -412,6 +416,7 @@ class DiscreteFactorGraph(FactorGraph):
             discrete_factor_model,
             (fs2dim,),
             dict(data=data),
+            train_options=train_options,
         )
         factors = [
             DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, pyro.param(make_factor_name(fs)))

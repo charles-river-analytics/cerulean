@@ -11,7 +11,7 @@ To install and work on this package locally:
 
 To install as part of another project:
 + `cd your/cerulean/dir`
-+ `git clone https://git.collab.cra.com/scm/prop/models.git`
++ `git clone https://git.collab.cra.com/scm/prop/cerulean.git`
 + `pip install -e your/cerulean/dir`
 
 ## Testing

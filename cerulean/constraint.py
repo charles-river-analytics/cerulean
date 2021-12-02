@@ -76,7 +76,7 @@ class ConstraintFactor(factor.DiscreteFactor):
         the_fs = dim.get_variable_str()
         the_dim = dim.get_dimensions()
         the_table = torch.randint(0, 1 + 1, the_dim)
-        return cls(the_fs, the_dim, the_table)
+        return cls(the_fs, the_dim, the_table, factor_name_prefix="RANDOM_CONSTRAINT")
 
     @classmethod
     def value(
@@ -95,13 +95,14 @@ class ConstraintFactor(factor.DiscreteFactor):
         the_dim = dim.get_dimensions()
         the_table = torch.zeros(the_dim)
         the_table[low:high] = torch.tensor(1.0)
-        return cls(the_fs, the_dim, the_table)
+        return cls(the_fs, the_dim, the_table, factor_name_prefix="VALUE_CONSTRAINT")
 
     @classmethod
     def pairwise(
         cls,
         dim: dimensions.FactorDimensions,
-        relation: Literal["==", "!=", "<", ">", "<=", ">="]
+        relation: Literal["==", "!=", "<", ">", "<=", ">="],
+        factor_name_prefix: str="PAIRWISE",
     ):
         """
         Define common pairwise constraints for two variables. 
@@ -117,20 +118,21 @@ class ConstraintFactor(factor.DiscreteFactor):
         the_fs = dim.get_variable_str()
         the_dim = dim.get_dimensions()
         the_table = _get_pairwise_constraint_table(the_dim, relation)
-        return cls(the_fs, the_dim, the_table)
+        return cls(the_fs, the_dim, the_table, factor_name_prefix=factor_name_prefix)
 
     def __init__(
         self,
         fs: str,
         dim: Union[torch.Size, tuple[int,...]],
         table: torch.Tensor,
+        factor_name_prefix: str="CONSTRAINT",
     ):
         # check that all entries in the table are zero or one
         if not all(map(lambda x: (x == 0) | (x == 1), table.view((-1,)))):
             raise ValueError("Construct ConstraintFactor with only {0,1} tensor.")
         name = f"ConstraintFactor({fs})"
         super().__init__(
-            name, fs, dim, table
+            name, fs, dim, table, factor_name_prefix=factor_name_prefix,
         )
 
 
@@ -144,7 +146,11 @@ def all_different(
     this function returns a tuple of :math:`N(N - 1)/2` `ConstraintFactor`s.
     """
     return (
-        ConstraintFactor.pairwise(dimensions.FactorDimensions(x, y), "!=")
+        ConstraintFactor.pairwise(
+            dimensions.FactorDimensions(x, y),
+            "!=",
+            factor_name_prefix="ALL_DIFFERENT",
+        )
         for (x, y) in itertools.combinations(variables, 2)
     )
 
@@ -159,7 +165,11 @@ def all_equal(
     this function returns a tuple of :math:`N(N - 1)/2` `ConstraintFactor`s.
     """
     return (
-        ConstraintFactor.pairwise(dimensions.FactorDimensions(x, y), "==")
+        ConstraintFactor.pairwise(
+            dimensions.FactorDimensions(x, y),
+            "==",
+            factor_name_prefix="ALL_EQUAL",
+        )
         for (x, y) in itertools.combinations(variables, 2)
     )
 
