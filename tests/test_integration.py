@@ -1,6 +1,8 @@
+
 import collections
 import datetime
 import logging
+import pathlib
 import time
 
 import numpy as np
@@ -224,3 +226,81 @@ def test_validation_statistics_bounds():
     assert kld_1_to_2 != kld_2_to_1
     logging.info(f"KLD(d1||d2) = {kld_1_to_2}")
     logging.info(f"KLD(d2||d2) = {kld_2_to_1}")
+
+
+@pytest.mark.timing
+@pytest.mark.slow
+def test_cache_utility_safe():
+    path = pathlib.Path("tests/test_cache_utility_out")
+    path.mkdir(exist_ok=True, parents=True,)
+    names = ["a", "b", "c", "d", "e", "f"]
+    dims = [3, 10, 25, 35, 50]
+    cache_sizes = [1, 5, len(names) + 2, int(len(names) * (len(names) - 1)/2) + 1]
+    results = pd.DataFrame(columns=dims, index=cache_sizes)
+
+    # SAFE
+    for dim in dims:
+        factory = cerulean.dimensions.DimensionsFactory(*names)
+        for name in names:
+            factory(name, dim)
+        factors = cerulean.constraint.all_different(
+            *(factory.get_variable(name) for name in names)
+        )
+        graph = cerulean.factor.DiscreteFactorGraph(*factors)
+        logging.info(f"Created graph: {graph}")
+        for cache_size in cache_sizes:
+            logging.info(f"Running inference with cache size = {cache_size}")
+            graph.set_inference_cache_size(cache_size)
+            times = []
+            for name in names:
+                t0 = time.time()
+                _ = graph.query(name)
+                t1 = time.time()
+                times.append(t1 - t0)
+            the_time = np.mean(times)
+            results[dim].loc[cache_size] = the_time
+    results.to_csv(path / "safe_times.csv")
+    logging.info(f"Timing of *SAFE* cache utility:\n{results}")
+
+
+@pytest.mark.timing
+@pytest.mark.slow
+def test_cache_utility_unsafe():
+    path = pathlib.Path("tests/test_cache_utility_out")
+    path.mkdir(exist_ok=True, parents=True,)
+    names = ["a", "b", "c", "d", "e", "f"]
+    dims = [3, 10, 25, 35, 50]
+    cache_sizes = [1, 5, len(names) + 2, int(len(names) * (len(names) - 1)/2) + 1]
+    results = pd.DataFrame(columns=dims, index=cache_sizes)
+
+    # UNSAFE
+    # here we know that the output factor dims are identical
+    for dim in dims:
+        factory = cerulean.dimensions.DimensionsFactory(*names)
+        for name in names:
+            factory(name, dim)
+        factors = cerulean.constraint.all_different(
+            *(factory.get_variable(name) for name in names)
+        )
+        graph = cerulean.factor.DiscreteFactorGraph(*factors)
+        # set up the contract expr only once 
+        # all vars have same dimension, just use one
+        graph.build_contract_expr(
+            result_spec="a",
+            optimize="random-greedy"
+        )
+        logging.info(graph._CONTRACT_EXPR)
+        logging.info(f"Created graph: {graph}")
+        for cache_size in cache_sizes:
+            logging.info(f"Running inference with cache size = {cache_size}")
+            graph.set_inference_cache_size(cache_size)
+            times = []
+            for name in names:
+                t0 = time.time()
+                _ = graph.query(name, safe=False)
+                t1 = time.time()
+                times.append(t1 - t0)
+            the_time = np.mean(times)
+            results[dim].loc[cache_size] = the_time
+    results.to_csv(path / "unsafe_times.csv")
+    logging.info(f"Timing of *UNSAFE* cache utility:\n{results}")

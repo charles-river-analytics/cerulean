@@ -8,6 +8,7 @@ import pytest
 
 
 @pytest.mark.factor
+@pytest.mark.slow
 def test_factor_names():
     fs = "ab"
     dim = (2, 3)

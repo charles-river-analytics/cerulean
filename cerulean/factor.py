@@ -20,28 +20,20 @@ from . import (
 )
 
 
-def discrete_joint_conditioned(eq: str, *tensors: torch.Tensor):
-    """
-    Computes the distribution :math:`p(V, E = e)` via (cached) variable elimination. 
-
-    TODO: ensure that we are using the most optimal caching strategy internally. This 
-    may involve actually using the underlying opt_einsum function call instead so that we can 
-    specify what tensors remain constant and other optimizations.
-    """
-    return opt_einsum.contract(eq, *tensors)
-
-
-def discrete_marginal(eq: str, *tensors: torch.Tensor):
+def discrete_marginal(
+    contract_op,
+    *tensors: torch.Tensor
+):
     """
     Computes the exact discrete_marginal distribution via (cached) variable elimination.
 
-    This method dispatches to `discrete_joint_conditioned` which computes 
-    :math:`p(V, E = e)`. This method then computes
+    This method computes 
+    :math:`p(V, E = e)`, then computes
     :math:`p(V | E = e) = p(V, E = e) / p(E = e)`. Note that the complexity of this method
     scales as :math:`\mathcal{O}(D^{|V|})` where :math:`D` is the maximum variable
     support cardinality.
     """
-    unscaled = discrete_joint_conditioned(eq, *tensors)
+    unscaled = contract_op(*tensors)
     return (unscaled / torch.sum(unscaled))
 
 
@@ -57,6 +49,7 @@ def discrete_factor_model(
     data: Optional[collections.OrderedDict[str,torch.Tensor]]=None,
     query_var: Optional[str]=None,
     factor_name_prefix: str="f",
+    contract_expr=None,
 ) -> Optional[torch.Tensor]:
     """A Pyro model corresponding to a discrete factor graph. This model supports both MLE parameter
     learning and inference.
@@ -84,17 +77,39 @@ def discrete_factor_model(
     network_string = ",".join(fs2dim.keys())
 
     if not query_var:
-        for var in fs2dim.keys():  # iterate through all defined cliques
-            pr = discrete_marginal(f"{network_string}->{var}", *factors.values())
-            with pyro.plate(f"{var}-plate") as ix:
-                pyro.sample(
-                    f"{var}-data",
-                    dist.Categorical(pr.reshape((-1,))),
-                    obs=data[var]
+        if contract_expr is None:
+            for var in fs2dim.keys():  # iterate through all defined cliques
+                contract_expr = opt_einsum.contract_expression(
+                    network_string + f"->{var}",
+                    *(f.shape for f in factors.values())
                 )
+                pr = discrete_marginal(contract_expr, *factors.values())
+                with pyro.plate(f"{var}-plate") as ix:
+                    pyro.sample(
+                        f"{var}-data",
+                        dist.Categorical(pr.reshape((-1,))),
+                        obs=data[var]
+                    )
+        else:
+            for var in fs2dim.keys():  # iterate through all defined cliques
+                pr = discrete_marginal(contract_expr, *factors.values())
+                with pyro.plate(f"{var}-plate") as ix:
+                    pyro.sample(
+                        f"{var}-data",
+                        dist.Categorical(pr.reshape((-1,))),
+                        obs=data[var]
+                    )
     else:
         with torch.no_grad():
-            return discrete_marginal(f"{network_string}->{query_var}", *factors.values())
+            if contract_expr is None:
+                contract_expr = opt_einsum.contract_expression(
+                    network_string + f"->{query_var}",
+                    *(f.shape for f in factors.values())
+                )
+                return discrete_marginal(contract_expr, *factors.values())
+            else:
+                return discrete_marginal(contract_expr, *factors.values())
+
 
 def mle_train(
     model: Callable,
@@ -201,7 +216,6 @@ class DiscreteFactor(FactorNode):
             raise ValueError(
                     f"Dimension specification {fs} doesn't match dims {dim}"
                 )
-        self.name = name
         self.fs = fs
         self.dim = dim
         if (table is not None) and (self.dim != table.shape):
@@ -216,6 +230,7 @@ class DiscreteFactor(FactorNode):
         self._variables_to_axis = collections.OrderedDict({
             var: i for (i, var) in enumerate(self._variables)
         })
+        self.name = self._factor_name_prefix + "_" + name
 
     def snapshot(self,):
         """
@@ -430,7 +445,8 @@ class DiscreteFactorGraph(FactorGraph):
     def __init__(
         self,
         *factors: DiscreteFactor,
-        ts: Optional[datetime.datetime]=None
+        ts: Optional[datetime.datetime]=None,
+        inference_cache_size: int=1,
     ):
         self.ts = ts
         self.factors = collections.OrderedDict({
@@ -443,6 +459,41 @@ class DiscreteFactorGraph(FactorGraph):
 
         self._evidence_cache = list()
         self._learned = False
+
+        # potentially use cache during inference
+        self.set_inference_cache_size(inference_cache_size)
+        self._CACHED_INTERMEDIATES = None
+        self.reset_inference_cache()
+
+        # precompute elimination paths
+        self.build_contract_expr()
+
+    def build_contract_expr(
+        self,
+        result_spec: str="",
+        optimize="greedy",
+    ):
+        self._CONTRACT_EXPR = opt_einsum.contract_expression(
+            ",".join(self.factors.keys()) + f"->{result_spec}",
+            *(f.shape for f in self.factors.values()),
+            optimize=optimize,
+        )
+
+    def reset_contract_expr(self,):
+        self.build_contract_expr()
+
+    def reset_inference_cache(self,):
+        if self._CACHED_INTERMEDIATES is not None:
+            del self._CACHED_INTERMEDIATES
+        with opt_einsum.shared_intermediates() as cache: pass
+        self._CACHED_INTERMEDIATES = cache
+        self._inference_iterations = 0
+
+    def set_inference_cache_size(self, size: int):
+        self._INFERENCE_CACHE_SIZE = size
+
+    def get_inference_cache_size(self,):
+        return self._INFERENCE_CACHE_SIZE
 
     def snapshot(self,):
         """
@@ -499,7 +550,12 @@ class DiscreteFactorGraph(FactorGraph):
         else:
             raise ValueError(f"Already posted evidence {ev}.") 
 
-    def query(self, variables: str):
+    def query(
+        self,
+        variables: str,
+        safe: bool=True,
+        contract_expr=None,
+    ):
         """Queries the factor graph for marginal or posterior distribution 
         corresponding to `variables`. Returns a `DiscreteFactor` instance. 
 
@@ -516,11 +572,17 @@ class DiscreteFactorGraph(FactorGraph):
         network_string = ",".join(self.fs2dim.keys())
         # NOTE: have to pass explicitly since we copy and alter tensors
         # taken from param store
-        with torch.no_grad():
-            result_table = discrete_marginal(
-                f"{network_string}->{variables}",
-                *(DiscreteFactor.table for DiscreteFactor in self.factors.values()),
-            )
+        if safe:
+             self.build_contract_expr(result_spec=variables,)
+        with opt_einsum.shared_intermediates(self._CACHED_INTERMEDIATES):
+            with torch.no_grad():
+                result_table = discrete_marginal(
+                    self._CONTRACT_EXPR,
+                    *(DiscreteFactor.table for DiscreteFactor in self.factors.values()),
+                )
+        self._inference_iterations += 1
+        if self._inference_iterations >= self._INFERENCE_CACHE_SIZE:
+            self.reset_inference_cache()
         return DiscreteFactor(
             f"{self.id}-query={variables}",
             variables,

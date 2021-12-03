@@ -141,6 +141,6 @@ class DimensionsFactory:
 
     def get_variable(self, name: str) -> VariableDimensions:
         """
-        Returns a dict of `{name: VariableDimension}`.
+        Returns the `VariableDimension` associated with `name`.
         """
         return self.names2variables[name]
