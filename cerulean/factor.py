@@ -50,6 +50,7 @@ def make_contract_expr(
     network_string: str,
     var: str,
     shapes,
+    optimize="greedy",
 ):
     """
     Generates a contraction path for inferring the marginal distribution of
@@ -62,6 +63,7 @@ def make_contract_expr(
     return opt_einsum.contract_expression(
         network_string + f"->{var}",
         *shapes,
+        optimize=optimize,
     )
 
 
@@ -523,11 +525,12 @@ class DiscreteFactorGraph(FactorGraph):
     def build_contract_expr(
         self,
         result_spec: str="",
-        optimize="greedy",
+        optimize="branch-2",
     ):
-        self._CONTRACT_EXPR = opt_einsum.contract_expression(
-            ",".join(self.factors.keys()) + f"->{result_spec}",
-            *(f.shape for f in self.factors.values()),
+        self._CONTRACT_EXPR = make_contract_expr(
+            ",".join(self.factors.keys()),
+            result_spec,
+            tuple(f.shape for f in self.factors.values()),
             optimize=optimize,
         )
 
