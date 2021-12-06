@@ -116,6 +116,9 @@ def plot_losses(
     losses: torch.Tensor,
     outpath=DEFAULT_OUTPATH,
 ):
+    """
+    Plot losses from training a `FactorGraph`.
+    """
     fig, ax = plt.subplots()
     ax.grid("on")
     ax.plot(

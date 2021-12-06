@@ -527,6 +527,14 @@ class DiscreteFactorGraph(FactorGraph):
         result_spec: str="",
         optimize="branch-2",
     ):
+        """
+        Dispatches to `make_contract_expr`, hence uses LRU cache.
+
+        Defaults: `result_spec=""` means that the path is optimized for
+        computing the partition function. `optimize="branch-2"` uses the 
+        branch-2 algorithm from `opt_einsum`, see that documentation for 
+        details.
+        """
         self._CONTRACT_EXPR = make_contract_expr(
             ",".join(self.factors.keys()),
             result_spec,
@@ -535,9 +543,17 @@ class DiscreteFactorGraph(FactorGraph):
         )
 
     def reset_contract_expr(self,):
+        """
+        Resets the contraction expression to something "safe" -- i.e., calls
+        `build_contract_expr` with defaults.
+        """
         self.build_contract_expr()
 
     def reset_inference_cache(self,):
+        """
+        Garbage-collects the intermedates cache, initializes a new one, and
+        sets the inference iterations to zero. 
+        """
         if self._CACHED_INTERMEDIATES is not None:
             del self._CACHED_INTERMEDIATES
         with opt_einsum.shared_intermediates() as cache: pass
@@ -545,9 +561,17 @@ class DiscreteFactorGraph(FactorGraph):
         self._inference_iterations = 0
 
     def set_inference_cache_size(self, size: int):
+        """
+        Sets the inference cache size to a positive integer.
+        """
+        if size < 1:
+            raise ValueError("Size of inference cache must be >= 1!")
         self._INFERENCE_CACHE_SIZE = size
 
     def get_inference_cache_size(self,):
+        """
+        Returns the inference cache size.
+        """
         return self._INFERENCE_CACHE_SIZE
 
     def snapshot(self,):
@@ -619,19 +643,26 @@ class DiscreteFactorGraph(FactorGraph):
         `.post_evidence("c", 2)`, then this method returns :math:`p(b | c = 2)`. 
         Passing `variables = "ab" after calling `.post_evidence("c", 2)` 
         would return :math:`p(a, b | c = 2)`, and so on.
+
+        The optional argument `safe` determines whether or not to use a pre-computed
+        contraction path. If `not safe`, then the instance's pre-computed contraction
+        expression (itself computed using `.build_contract_expr(...)` is used to compute 
+        the query, It is *not checked* if this contraction expression is even valid, nor 
+        is it checked that this contraction expression is fast. If in doubt, use `safe = True`,
+        the default value.
         """
         # TODO: should we call network_string on initialization and then
         # update only if we add / remove factors from network?
         # this adds to query time as is. 
         network_string = ",".join(self.fs2dim.keys())
-        # NOTE: have to pass explicitly since we copy and alter tensors
-        # taken from param store
         if safe:
              self.build_contract_expr(result_spec=variables,)
         with opt_einsum.shared_intermediates(self._CACHED_INTERMEDIATES):
             with torch.no_grad():
                 result_table = discrete_marginal(
                     self._CONTRACT_EXPR,
+                    # NOTE: have to pass explicitly since we copy and alter tensors
+                    # taken from param store
                     *(DiscreteFactor.table for DiscreteFactor in self.factors.values()),
                 )
         self._inference_iterations += 1
