@@ -61,6 +61,7 @@ def test_snapshot():
 
 @pytest.mark.slow
 @pytest.mark.training
+@cerulean.factor.contraction_cache_status
 def test_integration_1():
     #fs2dim = get_fs2dim(dims())
     a_dim = cerulean.dimensions.VariableDimensions("a", 2)
@@ -127,6 +128,7 @@ def test_integration_1():
 
 @pytest.mark.slow
 @pytest.mark.training
+@cerulean.factor.contraction_cache_status
 def test_visualization_and_divergence():
     a_dim = cerulean.dimensions.VariableDimensions("a", 2)
     b_dim = cerulean.dimensions.VariableDimensions("b", 3)
@@ -230,6 +232,7 @@ def test_validation_statistics_bounds():
 
 @pytest.mark.timing
 @pytest.mark.slow
+@cerulean.factor.contraction_cache_status
 def test_cache_utility_safe():
     path = pathlib.Path("tests/test_cache_utility_out")
     path.mkdir(exist_ok=True, parents=True,)
@@ -259,12 +262,14 @@ def test_cache_utility_safe():
                 times.append(t1 - t0)
             the_time = np.mean(times)
             results[dim].loc[cache_size] = the_time
+            graph.reset_inference_cache()
     results.to_csv(path / "safe_times.csv")
     logging.info(f"Timing of *SAFE* cache utility:\n{results}")
 
 
 @pytest.mark.timing
 @pytest.mark.slow
+@cerulean.factor.contraction_cache_status
 def test_cache_utility_unsafe():
     path = pathlib.Path("tests/test_cache_utility_out")
     path.mkdir(exist_ok=True, parents=True,)
@@ -302,5 +307,6 @@ def test_cache_utility_unsafe():
                 times.append(t1 - t0)
             the_time = np.mean(times)
             results[dim].loc[cache_size] = the_time
+            graph.reset_inference_cache()
     results.to_csv(path / "unsafe_times.csv")
     logging.info(f"Timing of *UNSAFE* cache utility:\n{results}")

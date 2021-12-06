@@ -48,6 +48,7 @@ def _probability_compare_1d(
     ax.set_ylabel(f"p({variables})", fontsize=FONTSIZE)
     ax.legend()
     plt.savefig(outpath / f"{variables}-marginal.png")
+    plt.close()
 
 
 def _probability_compare_2d(
@@ -108,6 +109,24 @@ def _probability_compare_2d(
         axes[1].text(i, j, round(label, 3), ha='center', va='center')
 
     plt.savefig(outpath / f"{variables}-marginal.png")
+    plt.close()
+
+
+def plot_losses(
+    losses: torch.Tensor,
+    outpath=DEFAULT_OUTPATH,
+):
+    fig, ax = plt.subplots()
+    ax.grid("on")
+    ax.plot(
+        losses.numpy(),
+        color="royalblue",
+    )
+    ax.set_xlabel("Iterations")
+    ax.set_ylabel("Loss value")
+    fig.tight_layout()
+    plt.savefig(outpath / f"losses.png")
+    plt.close()
 
 
 def probability_compare(

@@ -2,6 +2,7 @@
 import abc
 import collections
 import datetime
+import functools
 import logging
 from typing import Callable, Iterable, Literal, Optional, Union
 
@@ -44,6 +45,49 @@ def make_factor_name(fs: str, prefix: str="f"):
     return f"{prefix}_{fs}"
 
 
+@functools.lru_cache(maxsize=128,)
+def make_contract_expr(
+    network_string: str,
+    var: str,
+    shapes,
+):
+    """
+    Generates a contraction path for inferring the marginal distribution of
+    `var` from the factor graph denoted by `network_str` that consists of factors
+    with shapes given by `shapes`. 
+
+    NOTE: this method uses an LRU cache to store contraction paths. Paths are mapped to by
+    a (network_string, var, shapes) tuple.
+    """
+    return opt_einsum.contract_expression(
+        network_string + f"->{var}",
+        *shapes,
+    )
+
+
+def contraction_cache_info():
+    """
+    Returns the (hits, misses, maxsize, currsize) of the contraction path cache.
+    """
+    return make_contract_expr.cache_info()
+
+
+def contraction_cache_status(f):
+    """
+    Wraps the callable `f`, reporting cache status before and after `f` is executed.
+    """
+    def wrapper(*args, **kwargs):
+        logging.info(
+            f"Cache status before {f}: {contraction_cache_info()}"
+        )
+        rval = f(*args, **kwargs)
+        logging.info(
+            f"Cache status after {f}: {contraction_cache_info()}"
+        )
+        return rval
+    return wrapper
+
+
 def discrete_factor_model(
     fs2dim: collections.OrderedDict[str,tuple[int,...]],
     data: Optional[collections.OrderedDict[str,torch.Tensor]]=None,
@@ -58,7 +102,12 @@ def discrete_factor_model(
     {"ab": (2, 3), "bc": (3, 4)}.  
 
     If `data` is not None, then this function scores the observed data against the current values of the factors
-    using Pyro machiner. 
+    using Pyro machiner.
+
+    If `contract_expr` is not None, it must be an `opt_einsum.ContractExpression` defining the algorithm by which 
+    tensors are contracted. It is *not* checked that this is a valid contraction algorithm at runtime, nor is the
+    algorithm guaranteed to be fast if it is valid. If in doubt, pass `contract_expr=None` which will compute a valid
+    contraction at runtime.
     
     TODO: it should be possible to instead request a fully Bayesian treatment.
     Alternatively, if `query_var` is not None, this function performs exact inference using 
@@ -77,34 +126,37 @@ def discrete_factor_model(
     network_string = ",".join(fs2dim.keys())
 
     if not query_var:
-        if contract_expr is None:
-            for var in fs2dim.keys():  # iterate through all defined cliques
-                contract_expr = opt_einsum.contract_expression(
-                    network_string + f"->{var}",
-                    *(f.shape for f in factors.values())
-                )
-                pr = discrete_marginal(contract_expr, *factors.values())
-                with pyro.plate(f"{var}-plate") as ix:
-                    pyro.sample(
-                        f"{var}-data",
-                        dist.Categorical(pr.reshape((-1,))),
-                        obs=data[var]
+        with opt_einsum.shared_intermediates():  # NOTE: automated only during learning!
+            if contract_expr is None:
+                for var in fs2dim.keys():  # iterate through all defined cliques
+                    contract_expr = make_contract_expr(
+                        network_string,
+                        var,
+                        tuple(map(lambda f: f.shape, factors.values()))
                     )
-        else:
-            for var in fs2dim.keys():  # iterate through all defined cliques
-                pr = discrete_marginal(contract_expr, *factors.values())
-                with pyro.plate(f"{var}-plate") as ix:
-                    pyro.sample(
-                        f"{var}-data",
-                        dist.Categorical(pr.reshape((-1,))),
-                        obs=data[var]
-                    )
+                    pr = discrete_marginal(contract_expr, *factors.values())
+                    with pyro.plate(f"{var}-plate") as ix:
+                        pyro.sample(
+                            f"{var}-data",
+                            dist.Categorical(pr.reshape((-1,))),
+                            obs=data[var]
+                        )
+            else:
+                for var in fs2dim.keys():  # iterate through all defined cliques
+                    pr = discrete_marginal(contract_expr, *factors.values())
+                    with pyro.plate(f"{var}-plate") as ix:
+                        pyro.sample(
+                            f"{var}-data",
+                            dist.Categorical(pr.reshape((-1,))),
+                            obs=data[var]
+                        )
     else:
         with torch.no_grad():
             if contract_expr is None:
-                contract_expr = opt_einsum.contract_expression(
-                    network_string + f"->{query_var}",
-                    *(f.shape for f in factors.values())
+                contract_expr = make_contract_expr(
+                    network_string,
+                    query_var,
+                    tuple(map(lambda f: f.shape, factors.values()))
                 )
                 return discrete_marginal(contract_expr, *factors.values())
             else:
@@ -554,7 +606,6 @@ class DiscreteFactorGraph(FactorGraph):
         self,
         variables: str,
         safe: bool=True,
-        contract_expr=None,
     ):
         """Queries the factor graph for marginal or posterior distribution 
         corresponding to `variables`. Returns a `DiscreteFactor` instance. 
