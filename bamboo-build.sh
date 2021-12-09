@@ -12,4 +12,4 @@ python -m pip install -r requirements.txt
 
 python -m pytest --cov=cerulean
 
-deactivate
+conda deactivate
