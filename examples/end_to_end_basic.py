@@ -2,13 +2,18 @@
 import datetime
 import itertools
 import logging
+import pathlib
 
 import cerulean
 import pandas as pd
+import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 
 logging.basicConfig(level=logging.INFO)
+DEFAULT_OUTPATH = pathlib.Path("end_to_end_basic")
+DEFAULT_OUTPATH.mkdir(parents=True, exist_ok=True)
 
 
 def mock_price_dataframe():
@@ -17,24 +22,28 @@ def mock_price_dataframe():
             100.10,
             100.11,
             100.10,
+            100.09,
             100.08
         ],
         "NASDAQ": [
             100.10,
             100.11,
             100.11,
+            100.10,
             100.09
         ],
         "BATS": [
             100.09,
             100.11,
             100.10, 
+            100.10,
             100.09
         ]
     }, index=[
             datetime.datetime(2021,11,11,7,0,4,100000),
             datetime.datetime(2021,11,11,7,0,4,100003),
             datetime.datetime(2021,11,11,7,0,4,100012),
+            datetime.datetime(2021,11,11,7,0,4,100013),
             datetime.datetime(2021,11,11,7,0,4,100015)
     ])
 
@@ -55,11 +64,10 @@ def main():
     logging.info(f"Used {s} to make stationarized time series:\n{stationary}")
     # Step 2: discretize the stationary data. You can either let cerulean figure out the 
     # values to use as the max / min bin edges (not recommended) or you can do it yourself.
-    inflation = 0.2
-    the_min = stationary.values.flatten().min() * (1.0 + inflation)
-    the_max = stationary.values.flatten().max() * (1.0 + inflation)
-    # you also need to choose how many bins to have. Here we'll choose (arbitrarily) 25
-    n_bins = 25
+    the_min = -0.02
+    the_max = 0.02
+    # you also need to choose how many bins to have.
+    n_bins = 10
     n_cutpoints = n_bins + 1
     discrete_stationary = cerulean.transform.continuous_to_variable_level(
         stationary,
@@ -93,15 +101,103 @@ def main():
     logging.info(f"Learned a factor graph:\n{factor_graph}")
     # Step 4: run inference! This is the fun part -- figure things out.
     # Example: infer all marginal distributions (remember this is still of the stationarized data!)
-    marginals = {
+    prior_predictive_marginals = {
         name : factor_graph.query(variable_mapping[name])
         for name in discrete_stationary.columns
     }
-    logging.info(f"Inferred marginal distributions:\n{marginals}")
+    logging.info(f"Inferred prior predictive marginal factors:\n{prior_predictive_marginals}")
+    prior_predictive = {
+        name: f.table for (name, f) in prior_predictive_marginals.items()
+    }
+    logging.info(f"Inferred prior predictive:\n{prior_predictive}")
+    # Suppose now we observe a particular log difference in the BATS time series. Let's infer
+    # the other marginals. Remember to snapshot the model when you condition it on data!
+    new_graph = factor_graph.snapshot()
+    new_graph.post_evidence(variable_mapping["BATS"], torch.tensor(4))
+    posterior_predictive_marginals = {
+        name : new_graph.query(variable_mapping[name])
+        for name in ["NYSE", "NASDAQ"]
+    }
+    posterior_predictive = {
+        name: f.table for (name, f) in posterior_predictive_marginals.items()
+    }
+    logging.info(f"Inferred posterior predictive:\n{posterior_predictive}")
+    
+    # oooh, look at the pretty pictures!
+    fig, axes = plt.subplots(2, 1)
+    ax, ax2 = axes.flatten()
+    ax.grid("on")
+    ax.set_axisbelow(True)
+    ax2.grid("on")
+    ax2.set_axisbelow(True)
+    labels = np.arange(len(posterior_predictive["NYSE"]))
+    width = 0.35
 
+    ## NYSE
+    nyse_before_bars = ax.bar(
+        labels - width/2, prior_predictive["NYSE"], width,
+        label="Prior predictive",
+        hatch="//",
+        edgecolor="black"
+    )
+    ax.bar_label(
+        nyse_before_bars,
+        padding=3,
+        fmt="%.3f",
+        rotation=90,
+    )
+    nyse_after_bars = ax.bar(
+        labels + width/2, posterior_predictive["NYSE"], width,
+        label="Posterior predictive",
+        hatch="\\",
+        edgecolor="black"
+    )
+    ax.bar_label(
+        nyse_after_bars,
+        padding=3,
+        fmt="%.3f",
+        rotation=90
+    )
+    ax.set_yscale("log")
+    ax.set_xticks(labels,)
+    ax.set_xlabel(f"Stationarized value (NYSE)", fontsize=15)
+    ax.set_ylabel(f"Probability", fontsize=15)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.65),
+          fancybox=True, shadow=True, ncol=2)
 
+    ## NASDAQ
+    nasdaq_before_bars = ax2.bar(
+        labels - width/2, prior_predictive["NASDAQ"], width,
+        label="Prior predictive",
+        hatch="//",
+        edgecolor="black"
+    )
+    ax2.bar_label(
+        nasdaq_before_bars,
+        padding=3,
+        fmt="%.3f",
+        rotation=90,
+    )
+    nasdaq_after_bars = ax2.bar(
+        labels + width/2, posterior_predictive["NASDAQ"], width,
+        label="Posterior predictive",
+        hatch="\\",
+        edgecolor="black"
+    )
+    ax2.bar_label(
+        nasdaq_after_bars,
+        padding=3,
+        fmt="%.3f",
+        rotation=90
+    )
+    ax2.set_yscale("log")
+    ax2.set_xticks(labels,)
+    ax2.set_xlabel(f"Stationarized value (NASDAQ)", fontsize=15)
+    ax2.set_ylabel(f"Probability", fontsize=15)
 
-
+    fig.tight_layout()
+    plt.savefig(DEFAULT_OUTPATH / f"end-to-end-basic-marginal.png")
+    plt.close()
 
 
 if __name__ == "__main__":
