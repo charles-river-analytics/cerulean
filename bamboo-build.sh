@@ -6,7 +6,7 @@ conda init bash
 
 conda create -y --name proper-fm python=3.9
 
-activate -y proper-fm
+activate proper-fm
 
 python -m pip install -r requirements.txt
 
