@@ -11,3 +11,7 @@ markers = [
     "factor: marks test as explicitly testing factor capabilities",
     "timing: marks test as explicitly involving wallclock time calculations"
 ]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"

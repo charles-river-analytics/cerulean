@@ -14,6 +14,13 @@ To install as part of another project:
 + `git clone https://git.collab.cra.com/scm/prop/cerulean.git`
 + `pip install -e your/cerulean/dir`
 
+To build and pip install into the environment:
++ `conda activate proper-fm`
++ `cd your/cerulean/dir`
++ `python -m pip install build` # one-time
++ `python -m build`
++ `python -m pip install --find-links https://download.pytorch.org/whl/cu113/torch_stable.html dist/cerulean-0.0.1-py3-none-any.whl`
+  
 ## Testing
 This project uses `pytest`. In the top-level directory, run `/opt/anaconda3/envs/proper-fm/bin/python -m pytest --cov=cerulean` 
 to execute all tests and see statistics of test coverage.
