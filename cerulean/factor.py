@@ -504,9 +504,11 @@ class DiscreteFactorGraph(FactorGraph):
     ):
         self.ts = ts
         self.factors = collections.OrderedDict({
-            f.fs: f for f in factors
+            f.name: f for f in factors
         })
         self.id = type(self)._next_id()
+        # NOTE this is okay even if we overwrite, since two factors with the same fs must by definition
+        # relate the same clique of variables, hence the same dimension tuple.
         self.fs2dim = collections.OrderedDict({
             f.fs: f.dim for f in self.factors.values()
         })
@@ -536,7 +538,7 @@ class DiscreteFactorGraph(FactorGraph):
         details.
         """
         self._CONTRACT_EXPR = make_contract_expr(
-            ",".join(self.factors.keys()),
+            ",".join([f.fs for f in self.factors.values()]),
             result_spec,
             tuple(f.shape for f in self.factors.values()),
             optimize=optimize,
@@ -599,19 +601,14 @@ class DiscreteFactorGraph(FactorGraph):
         """Returns dimensions of each factor in a `collections.OrderedDict`
         """
         return collections.OrderedDict({
-            ix: f.shape for (ix, f) in self.factors.items()
+            factor_name: factor.shape for (factor_name, factor) in self.factors.items()
         })
 
-    def get_factor(self, fs: str):
-        """Returns the factor corresponding to the dimension string
-        `fs`. 
-        
-        TODO: this should be updated to return factor by name
-        instead of by dimension string; right now this has the implicit
-        assumption that each dimension string is unique, which does not
-        have to be the case.
+    def get_factor(self, name: str):
+        """Returns the factor corresponding to the factor name. Raises `KeyError` if this
+        factor is not in the graph.
         """
-        return self.factors[fs].get_factor()
+        return self.factors[name].get_factor()
 
     def post_evidence(self, var: str, level: int):
         """Posts evidence to the factor graph. 
@@ -622,6 +619,8 @@ class DiscreteFactorGraph(FactorGraph):
         """
         ev = (var, level)
         if ev not in self._evidence_cache:
+            # NOTE: okay after changing fs -> name since this expresses correct intent:
+            # looking up factor by *unique* name, applying evidence, and setting the value
             for name in self.factors.keys():
                 self.factors[name] = self.factors[name]._post_evidence(var, level)
             self._evidence_cache.append(ev)
@@ -663,7 +662,7 @@ class DiscreteFactorGraph(FactorGraph):
                     self._CONTRACT_EXPR,
                     # NOTE: have to pass explicitly since we copy and alter tensors
                     # taken from param store
-                    *(DiscreteFactor.table for DiscreteFactor in self.factors.values()),
+                    *(factor.table for factor in self.factors.values()),
                 )
         self._inference_iterations += 1
         if self._inference_iterations >= self._INFERENCE_CACHE_SIZE:
@@ -673,4 +672,20 @@ class DiscreteFactorGraph(FactorGraph):
             variables,
             result_table.shape,
             result_table
+        )
+
+    def link(self, other):
+        """
+        Join this factor graph with another of the same type. Raises `ValueError` if there are
+        two factors with the same name. Returns another DiscreteFactorGraph that is the
+        (disjoint) union of the two original factor graphs.
+
+        All factors are snapshot so there is no linkage to any global state in the resulting graph.
+        """
+        for (my_name, my_factor) in self.factors.items():
+            for (their_name, their_factor) in other.factors.items():
+                if my_name == their_name:
+                    raise ValueError(f"Can't link because {self.id} and {other.id} both have factors named {my_name}")
+        return DiscreteFactorGraph(
+            *([f.snapshot() for f in self.factors.values()] + [f.snapshot() for f in other.factors.values()])
         )
