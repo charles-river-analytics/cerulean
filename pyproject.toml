@@ -8,5 +8,10 @@ markers = [
     "training: marks tests as involving a training step",
     "scaling: marks tests as involving a scaling study",
     "constraint: marks tests as explicitly testing constraint capabilities",
-    "factor: marks test as explicitly testing factor capabilities"
+    "factor: marks test as explicitly testing factor capabilities",
+    "timing: marks test as explicitly involving wallclock time calculations"
 ]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"

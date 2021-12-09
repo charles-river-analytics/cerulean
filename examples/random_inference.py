@@ -155,7 +155,7 @@ def make_evidence_ts(n_ts:int, n_cutpoints: int):
 
 
 def setup_market_model(n_cutpoints: int):
-    n_ts = 25
+    n_ts = 100
     names = ["A", "B", "C", "D"]
     factory = cerulean.dimensions.DimensionsFactory(*names)
     for name in names:
@@ -170,7 +170,7 @@ def setup_market_model(n_cutpoints: int):
     trained_model = cerulean.factor.DiscreteFactorGraph.learn(
         factor_dims,
         data,
-        train_options=dict(verbosity=1, num_iterations=2)
+        train_options=dict(verbosity=20, num_iterations=100)
     )
     return trained_model
 
@@ -203,7 +203,7 @@ def time_market_model_infer_nminus1(
 
 
 def market_model_scaling_data(num_reruns: int):
-    ctpts = [5, 9, 15, 31, 61, 101, 201]
+    ctpts = [5, 9, 15, 31, 61, 101,] 
     columns = ["Infer 1", "Infer N-1"]
     fns = [
         time_market_model_infer_1,
@@ -212,7 +212,8 @@ def market_model_scaling_data(num_reruns: int):
     df = pd.DataFrame(columns=columns, index=ctpts)
     for n_cutpoints in ctpts:
         logging.info(f"Doing market inference with {n_cutpoints} discretization")
-        trained_model, _ = setup_market_model(n_cutpoints)
+        trained_model, loss_values = setup_market_model(n_cutpoints)
+        cerulean.visualization.plot_losses(loss_values, outpath=DEFAULT_OUTPATH,)
         for (col, fn) in zip(columns, fns):
             vals = []
             for n in range(num_reruns):
