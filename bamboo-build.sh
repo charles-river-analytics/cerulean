@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source /opt/anaconda/etc/profile.d/conda.sh
+source /opt/conda/bin/conda
 
 conda init bash
 
