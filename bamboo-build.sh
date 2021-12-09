@@ -4,9 +4,9 @@ source /opt/conda/bin/conda
 
 conda init bash
 
-conda create --name proper-fm python=3.9
+conda create -y --name proper-fm python=3.9
 
-activate proper-fm
+activate -y proper-fm
 
 python -m pip install -r requirements.txt
 
