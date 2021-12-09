@@ -2,6 +2,8 @@
 
 source /opt/anaconda/etc/profile.d/conda.sh
 
+conda init bash
+
 rem Activate the conda environment
 conda activate proper-fm
 
