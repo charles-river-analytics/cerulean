@@ -52,10 +52,11 @@ def test_snapshot():
         assert torch.equal(old_f.get_table(), new_f.get_table())
 
     # modify original graph and check that the new one doesn't change
-    old_fg.factors["ab"].table[0, 1] += torch.tensor(1.0)
+    clique_name = "f_DiscreteFactor(ab)"
+    old_fg.factors[clique_name].table[0, 1] += torch.tensor(1.0)
     assert not torch.equal(
-        old_fg.factors["ab"].table,
-        new_fg.factors["ab"].table
+        old_fg.factors[clique_name].table,
+        new_fg.factors["f_f_DiscreteFactor(ab)"].table
     )
 
 
@@ -86,11 +87,11 @@ def test_integration_1():
     
     # look at the actual learned factors
     # not the same as the marginals of the cliques
-    clique = "ab"
-    p_clique = factor_graph.query(clique).get_table()
-    clique_factor = factor_graph.get_factor(clique)
-    logging.info(f"f_{clique} = {clique_factor}")
-    logging.info(f"p({clique}) = {p_clique}")
+    clique_name = "f_DiscreteFactor(ab)"
+    p_clique = factor_graph.query(ab_dim.get_variable_str()).get_table()
+    clique_factor = factor_graph.get_factor(clique_name)
+    logging.info(f"f_{clique_name} = {clique_factor}")
+    logging.info(f"p({clique_name}) = {p_clique}")
     with torch.no_grad():
         normalized_clique_factor = clique_factor / torch.sum(clique_factor)
     logging.info(f"Normalized clique factor = {normalized_clique_factor}")
