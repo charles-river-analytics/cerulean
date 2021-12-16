@@ -147,3 +147,4 @@ cython_debug/
 # artifacts from integration testing
 figures
 figures/*
+tests/test_cache_utility_out/*
