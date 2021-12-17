@@ -165,51 +165,20 @@ def discrete_factor_model(
                 return discrete_marginal(contract_expr, *factors.values())
 
 
-def mle_train(
-    model: Callable,
-    model_args: tuple,
-    model_kwargs: dict,
-    num_iterations: int=1000,
-    lr: float=0.01,
-    train_options: dict=dict(),
-) -> torch.Tensor:
-    """Trains the parameters of an MLE model. 
-    
-    NOTE: the model must actually be an MLE model 
-    (i.e., have no latent random variables) as this function maximizes the ELBO using an empty 
-    guide, which will result in an error if the model has latent random variables.
-
-    The callable model must be a Pyro stochastic function, while the model_args and model_kwargs are the 
-    positional and keyword arguments that the model requires. The optimization will proceed for `num_iterations`
-    iterations using the learning rate `lr`. 
-    
-    NOTE: right now this uses the Adam optimizer. We should a) allow the user
-    to specify what optimizers they want to use and b) experiment with choices of optimizer on real problems to 
-    see if we can find heuristics on which ones are better choices conditioned on context. 
-    """
-    if train_options is None:
-        train_options = dict()
+def _setup_svi(
+    model,
+    train_options: dict,
+):
     opt_str = train_options.get("opt", "Adam")
     opt_cls = getattr(pyro.optim, opt_str)
     guide = lambda *args, **kwargs: None
 
-    lr = train_options.get("lr", lr)
-    opt = opt_cls(dict(lr=lr))
+    lr = train_options.get("lr", 0.01)
+    opt = opt_cls(dict(lr=0.01))
     loss = pyro.infer.Trace_ELBO()
     svi = pyro.infer.SVI(model, guide, opt, loss=loss)
-    
-    pyro.clear_param_store()
-    losses = torch.empty((num_iterations,))
+    return svi
 
-    verbosity = train_options.get("verbosity", 100)
-    num_iterations = train_options.get("num_iterations", num_iterations)
-    
-    for j in range(num_iterations):
-        loss = svi.step(*model_args, **model_kwargs)
-        if j % verbosity == 0:
-            logging.info(f"On iteration {j}, -log p(x) = {loss}")
-        losses[j] = loss
-    return losses
 
 def query(
     model: Callable,
@@ -464,6 +433,31 @@ class DiscreteFactorGraph(FactorGraph):
         return f"DiscreteFactorGraph{cls.count}"
 
     @classmethod
+    def _mle_train(
+        cls,
+        fs2dim: collections.OrderedDict[str, tuple[int,...]],
+        data: collections.OrderedDict[str, torch.Tensor],
+        num_iterations: int=1000,
+        lr: float=0.01,
+        train_options: dict=dict(),
+    ) -> torch.Tensor:
+        """Trains the parameters of an MLE discrete factor model.
+        """
+        train_options = train_options or dict()
+        svi = _setup_svi(discrete_factor_model, train_options=train_options,)
+        pyro.clear_param_store()
+        losses = torch.empty((num_iterations,))
+        verbosity = train_options.get("verbosity", 100)
+        num_iterations = train_options.get("num_iterations", num_iterations)
+        
+        for j in range(num_iterations):
+            loss = svi.step(fs2dim, data=data,)
+            if j % verbosity == 0:
+                logging.info(f"On iteration {j}, -log p(x) = {loss}")
+            losses[j] = loss
+        return losses
+
+    @classmethod
     def learn(
         cls,
         dimensions: Iterable[dimensions.FactorDimensions],
@@ -481,10 +475,9 @@ class DiscreteFactorGraph(FactorGraph):
         dims = [d.get_dimensions() for d in dimensions]
         data = transform._df2od_torch(data, variables, dims)
         fs2dim = collections.OrderedDict((d.get_factor_spec() for d in dimensions))
-        losses = mle_train(
-            discrete_factor_model,
-            (fs2dim,),
-            dict(data=data),
+        losses = cls._mle_train(
+            fs2dim,
+            data,
             train_options=train_options,
         )
         factors = [
