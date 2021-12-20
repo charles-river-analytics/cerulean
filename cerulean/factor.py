@@ -503,7 +503,8 @@ class DiscreteFactorGraph(FactorGraph):
         j = 0
         len_column_mapping = len(column_mapping)
         for epoch in range(num_epochs):
-            logging.info(f"On epoch {epoch}")
+            if j % verbosity == 0:
+                logging.info(f"On epoch {epoch}")
             data_generator = data()
             for batch in data_generator:  # NOTE: assuming that each batch is a pd.DataFrame
                 (fs2dim, batch) = cls._transform_dims_data(
