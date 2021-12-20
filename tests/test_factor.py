@@ -56,6 +56,42 @@ def test_factor_names():
 
 @pytest.mark.factor
 @pytest.mark.slow
+def test_column_rename_in_learn():
+    dim = (2, 3)
+    data = pd.DataFrame({
+        "Q": [1, 0], 
+        "X": [1, 1]
+    })
+
+    factory = cerulean.dimensions.DimensionsFactory("Q", "X")
+    factory("Q", dim[0])
+    factory("X", dim[1])
+    
+    with pytest.raises(KeyError):  # haven't mapped variables to dimension strings a, b, ab
+        graph = cerulean.factor.DiscreteFactorGraph.learn(
+            (factory(("Q",)), factory(("X",)), factory(("Q", "X"))),
+            data,
+            train_options={"num_iterations": 2}
+        )
+
+    graph_1, _ = cerulean.factor.DiscreteFactorGraph.learn(
+        (factory(("Q",)), factory(("X",)), factory(("Q", "X"))),
+        data.rename(columns=factory.mapping()),
+        train_options={"num_iterations": 2}
+    )
+    logging.info(f"Learned graph after manually renaming data:\n{graph_1}")
+    # should be equivalent to above
+    graph_2, _ = cerulean.factor.DiscreteFactorGraph.learn(
+        (factory(("Q",)), factory(("X",)), factory(("Q", "X"))),
+        data,
+        train_options={"num_iterations": 2},
+        column_mapping=factory.mapping(),
+    )
+    logging.info(f"Learned graph after passing mapping:\n{graph_2}")
+
+
+@pytest.mark.factor
+@pytest.mark.slow
 def test_link():
     # first graph
     data = pd.DataFrame({

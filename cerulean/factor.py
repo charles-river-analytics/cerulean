@@ -4,7 +4,14 @@ import collections
 import datetime
 import functools
 import logging
-from typing import Callable, Iterable, Literal, Optional, Union
+from typing import (
+    Callable,
+    Iterable,
+    Literal,
+    Mapping,
+    Optional,
+    Union
+)
 
 import mypy
 import numpy as np
@@ -458,11 +465,65 @@ class DiscreteFactorGraph(FactorGraph):
         return losses
 
     @classmethod
-    def learn(
+    def _transform_dims_data(
         cls,
         dimensions: Iterable[dimensions.FactorDimensions],
         data: pd.DataFrame,
+        column_mapping: Mapping[str, str]=dict(),
+    ):
+        if len(column_mapping) > 0:
+            data = data.rename(columns=column_mapping)
+        variables = [d.get_variables() for d in dimensions]
+        dims = [d.get_dimensions() for d in dimensions]
+        data = transform._df2od_torch(data, variables, dims)
+        fs2dim = collections.OrderedDict((d.get_factor_spec() for d in dimensions))
+        return (fs2dim, data)
+
+    @classmethod
+    def _mle_train_from_generator(
+        cls,
+        dimensions: Iterable[dimensions.FactorDimensions],
+        data: Iterable,
+        train_options: Optional[dict]=dict(),
+        column_mapping: Mapping[str, str]=dict(),
+    ):
+        """
+        Trains an MLE discrete factor model using a data generator. 
+
+        `data` should be a generator that subclasses `torch.utils.data.IterableDataset`.
+        This generator should yield `pd.DataFrame`s when calling `__iter__`.
+
+        """
+        train_options = train_options or dict()
+        num_epochs = train_options.get("num_epochs", 1)
+        svi = _setup_svi(discrete_factor_model, train_options=train_options,)
+        pyro.clear_param_store()
+        losses = []
+        verbosity = train_options.get("verbosity", 100)
+        num_iterations = train_options.get("num_iterations", num_iterations)
+        j = 0
+        len_column_mapping = len(column_mapping)
+        for epoch in range(num_epochs):
+            for batch in data:  # NOTE: assuming that each batch is a pd.DataFrame
+                (fs2dim, batch) = cls._transform_dims_data(
+                    dimensions,
+                    batch,
+                    column_mapping=column_mapping,
+                )
+                loss = svi.step(fs2dim, data=batch,)
+                if j % verbosity == 0:
+                    logging.info(f"On iteration {j}, -log p(x) = {loss}")
+                losses.append(loss)
+                j += 1
+        return (torch.tensor(losses), fs2dim)
+
+    @classmethod
+    def learn(
+        cls,
+        dimensions: Iterable[dimensions.FactorDimensions],
+        data: Union[Iterable, pd.DataFrame],
         train_options: Optional[dict]=None,
+        column_mapping: Mapping[str, str]=dict(),
     ):
         """Learns parameters of factors in a factor graph from data.
 
@@ -471,15 +532,24 @@ class DiscreteFactorGraph(FactorGraph):
         + `data`: `pandas.DataFrame`. Each column must be equal length and correspond to observations
             of the variable given in the header of the column.
         """
-        variables = [d.get_variables() for d in dimensions]
-        dims = [d.get_dimensions() for d in dimensions]
-        data = transform._df2od_torch(data, variables, dims)
-        fs2dim = collections.OrderedDict((d.get_factor_spec() for d in dimensions))
-        losses = cls._mle_train(
-            fs2dim,
-            data,
-            train_options=train_options,
-        )
+        if type(data) == pd.DataFrame:
+            (fs2dim, data) = cls._transform_dims_data(
+                dimensions,
+                data,
+                column_mapping=column_mapping,
+            )
+            losses = cls._mle_train(
+                fs2dim,
+                data,
+                train_options=train_options,
+            )
+        # TODO: test to ensure that the passed Iterable *is* a generator better
+        else:  # is a generator
+            (losses, fs2dim) = cls._mle_train_from_generator(
+                data,
+                train_options=train_options,
+                column_mapping=column_mapping,  # calls _transform_dims_data internally
+            )
         factors = [
             DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, pyro.param(make_factor_name(fs)))
             for (fs, dim) in fs2dim.items()
