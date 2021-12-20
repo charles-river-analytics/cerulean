@@ -473,9 +473,9 @@ class DiscreteFactorGraph(FactorGraph):
     ):
         if len(column_mapping) > 0:
             data = data.rename(columns=column_mapping)
-        variables = [d.get_variables() for d in dimensions]
+        variable_groups = [d.get_variables() for d in dimensions]
         dims = [d.get_dimensions() for d in dimensions]
-        data = transform._df2od_torch(data, variables, dims)
+        data = transform._df2od_torch(data, variable_groups, dims)
         fs2dim = collections.OrderedDict((d.get_factor_spec() for d in dimensions))
         return (fs2dim, data)
 
@@ -483,15 +483,15 @@ class DiscreteFactorGraph(FactorGraph):
     def _mle_train_from_generator(
         cls,
         dimensions: Iterable[dimensions.FactorDimensions],
-        data: Iterable,
+        data: Callable,
         train_options: Optional[dict]=dict(),
         column_mapping: Mapping[str, str]=dict(),
     ):
         """
         Trains an MLE discrete factor model using a data generator. 
 
-        `data` should be a generator that subclasses `torch.utils.data.IterableDataset`.
-        This generator should yield `pd.DataFrame`s when calling `__iter__`.
+        `data` should be a callable that, when called with no arguments, emits a generator that
+        emits `pd.DataFrame`s.
 
         """
         train_options = train_options or dict()
@@ -500,11 +500,12 @@ class DiscreteFactorGraph(FactorGraph):
         pyro.clear_param_store()
         losses = []
         verbosity = train_options.get("verbosity", 100)
-        num_iterations = train_options.get("num_iterations", num_iterations)
         j = 0
         len_column_mapping = len(column_mapping)
         for epoch in range(num_epochs):
-            for batch in data:  # NOTE: assuming that each batch is a pd.DataFrame
+            logging.info(f"On epoch {epoch}")
+            data_generator = data()
+            for batch in data_generator:  # NOTE: assuming that each batch is a pd.DataFrame
                 (fs2dim, batch) = cls._transform_dims_data(
                     dimensions,
                     batch,
@@ -546,6 +547,7 @@ class DiscreteFactorGraph(FactorGraph):
         # TODO: test to ensure that the passed Iterable *is* a generator better
         else:  # is a generator
             (losses, fs2dim) = cls._mle_train_from_generator(
+                dimensions,
                 data,
                 train_options=train_options,
                 column_mapping=column_mapping,  # calls _transform_dims_data internally
