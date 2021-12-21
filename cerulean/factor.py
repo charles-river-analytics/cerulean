@@ -517,7 +517,11 @@ class DiscreteFactorGraph(FactorGraph):
                     logging.info(f"On iteration {j}, -log p(x) = {loss}")
                 losses.append(loss)
                 j += 1
-        return (torch.tensor(losses), fs2dim)
+        # if we iterated through an empty generator, something went wrong
+        if j > 0:
+            return (torch.tensor(losses), fs2dim)
+        else:
+            raise ValueError(f"At least one of the generators returned by {data} was empty!")
 
     @classmethod
     def learn(
