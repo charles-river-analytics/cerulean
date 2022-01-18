@@ -6,16 +6,16 @@ It is developed as part of the PROPER-FM effort under DARPA I2O ECoSystemic.
 ## Installation
 
 To use the latest cerulean development Docker image (requires Docker be installed):
-+ First, if you haven't done so, create a CRA collaboration DTR access token (one time step)
-++ Point a browser at `dtr.collab.cra.com` and login
-++ Create a new Access Token (under the Profile menu)
-++ Record the access token and don't lose it; you will use as a password later
-+ Open a command prompt
-+ `docker login dtr.collab.cra.com --username=<your_dtr_username>`
-++ Use your DTR access token as your password
-+ `docker pull dtr.collab.cra.com/proper-fm/cerulean:latest`
-+ `docker run -it dtr.collab.cra.com/proper-fm/cerulean:latest`
-+ `conda activate proper-fm`
+- First, if you haven't done so, create a CRA collaboration DTR access token (one time step)
+    - Point a browser at `dtr.collab.cra.com` and login
+    - Create a new Access Token (under the Profile menu)
+    - Record the access token and don't lose it; you will use as a password later
+- Open a command prompt
+- `docker login dtr.collab.cra.com --username=<your_dtr_username>`
+    - Use your DTR access token as your password
+- `docker pull dtr.collab.cra.com/proper-fm/cerulean:latest`
+- `docker run -it dtr.collab.cra.com/proper-fm/cerulean:latest`
+- `conda activate proper-fm`
 
 To install and work on this package locally:
 + `conda create --name proper-fm python=3.9`
