@@ -1,5 +1,6 @@
 import collections
 import datetime
+import logging
 from typing import Callable, Iterable, Literal, Optional
 
 import mypy
@@ -33,10 +34,17 @@ def _df2od_torch(
     # each (variable, dimension) corresponds to a single factor's info
     for (variable_list, dimension_tuple) in zip(variables, dimensions):
         factor_index_values = [df[k].values for k in variable_list]
-        flattened_index_values = np.ravel_multi_index(
-            factor_index_values,
-            dimension_tuple
-        )
+        try:
+            flattened_index_values = np.ravel_multi_index(
+                factor_index_values,
+                dimension_tuple
+            )
+        except ValueError:
+            the_error = f"Can't unravel factors with dims {dimension_tuple},"
+            the_error += " does the discretization of data in the generator"
+            the_error += " align with these dimensions?"
+            logging.error(the_error)
+            raise ValueError(the_error)
         out["".join(variable_list)] = torch.Tensor(flattened_index_values)
     return out
 

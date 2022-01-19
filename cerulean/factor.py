@@ -4,7 +4,14 @@ import collections
 import datetime
 import functools
 import logging
-from typing import Callable, Iterable, Literal, Optional, Union
+from typing import (
+    Callable,
+    Iterable,
+    Literal,
+    Mapping,
+    Optional,
+    Union
+)
 
 import mypy
 import numpy as np
@@ -165,51 +172,20 @@ def discrete_factor_model(
                 return discrete_marginal(contract_expr, *factors.values())
 
 
-def mle_train(
-    model: Callable,
-    model_args: tuple,
-    model_kwargs: dict,
-    num_iterations: int=1000,
-    lr: float=0.01,
-    train_options: dict=dict(),
-) -> torch.Tensor:
-    """Trains the parameters of an MLE model. 
-    
-    NOTE: the model must actually be an MLE model 
-    (i.e., have no latent random variables) as this function maximizes the ELBO using an empty 
-    guide, which will result in an error if the model has latent random variables.
-
-    The callable model must be a Pyro stochastic function, while the model_args and model_kwargs are the 
-    positional and keyword arguments that the model requires. The optimization will proceed for `num_iterations`
-    iterations using the learning rate `lr`. 
-    
-    NOTE: right now this uses the Adam optimizer. We should a) allow the user
-    to specify what optimizers they want to use and b) experiment with choices of optimizer on real problems to 
-    see if we can find heuristics on which ones are better choices conditioned on context. 
-    """
-    if train_options is None:
-        train_options = dict()
+def _setup_svi(
+    model,
+    train_options: dict,
+):
     opt_str = train_options.get("opt", "Adam")
     opt_cls = getattr(pyro.optim, opt_str)
     guide = lambda *args, **kwargs: None
 
-    lr = train_options.get("lr", lr)
-    opt = opt_cls(dict(lr=lr))
+    lr = train_options.get("lr", 0.01)
+    opt = opt_cls(dict(lr=0.01))
     loss = pyro.infer.Trace_ELBO()
     svi = pyro.infer.SVI(model, guide, opt, loss=loss)
-    
-    pyro.clear_param_store()
-    losses = torch.empty((num_iterations,))
+    return svi
 
-    verbosity = train_options.get("verbosity", 100)
-    num_iterations = train_options.get("num_iterations", num_iterations)
-    
-    for j in range(num_iterations):
-        loss = svi.step(*model_args, **model_kwargs)
-        if j % verbosity == 0:
-            logging.info(f"On iteration {j}, -log p(x) = {loss}")
-        losses[j] = loss
-    return losses
 
 def query(
     model: Callable,
@@ -464,11 +440,96 @@ class DiscreteFactorGraph(FactorGraph):
         return f"DiscreteFactorGraph{cls.count}"
 
     @classmethod
-    def learn(
+    def _mle_train(
+        cls,
+        fs2dim: collections.OrderedDict[str, tuple[int,...]],
+        data: collections.OrderedDict[str, torch.Tensor],
+        num_iterations: int=1000,
+        lr: float=0.01,
+        train_options: dict=dict(),
+    ) -> torch.Tensor:
+        """Trains the parameters of an MLE discrete factor model.
+        """
+        train_options = train_options or dict()
+        svi = _setup_svi(discrete_factor_model, train_options=train_options,)
+        pyro.clear_param_store()
+        losses = torch.empty((num_iterations,))
+        verbosity = train_options.get("verbosity", 100)
+        num_iterations = train_options.get("num_iterations", num_iterations)
+        
+        for j in range(num_iterations):
+            loss = svi.step(fs2dim, data=data,)
+            if j % verbosity == 0:
+                logging.info(f"On iteration {j}, -log p(x) = {loss}")
+            losses[j] = loss
+        return losses
+
+    @classmethod
+    def _transform_dims_data(
         cls,
         dimensions: Iterable[dimensions.FactorDimensions],
         data: pd.DataFrame,
+        column_mapping: Mapping[str, str]=dict(),
+    ):
+        if len(column_mapping) > 0:
+            data = data.rename(columns=column_mapping)
+        variable_groups = [d.get_variables() for d in dimensions]
+        dims = [d.get_dimensions() for d in dimensions]
+        data = transform._df2od_torch(data, variable_groups, dims)
+        fs2dim = collections.OrderedDict((d.get_factor_spec() for d in dimensions))
+        return (fs2dim, data)
+
+    @classmethod
+    def _mle_train_from_generator(
+        cls,
+        dimensions: Iterable[dimensions.FactorDimensions],
+        data: Callable,
+        train_options: Optional[dict]=dict(),
+        column_mapping: Mapping[str, str]=dict(),
+    ):
+        """
+        Trains an MLE discrete factor model using a data generator. 
+
+        `data` should be a callable that, when called with no arguments, emits a generator that
+        emits `pd.DataFrame`s.
+
+        """
+        train_options = train_options or dict()
+        num_epochs = train_options.get("num_epochs", 1)
+        svi = _setup_svi(discrete_factor_model, train_options=train_options,)
+        pyro.clear_param_store()
+        losses = []
+        verbosity = train_options.get("verbosity", 100)
+        j = 0
+        len_column_mapping = len(column_mapping)
+        for epoch in range(num_epochs):
+            if j % verbosity == 0:
+                logging.info(f"On epoch {epoch}")
+            data_generator = data()
+            for batch in data_generator:  # NOTE: assuming that each batch is a pd.DataFrame
+                (fs2dim, batch) = cls._transform_dims_data(
+                    dimensions,
+                    batch,
+                    column_mapping=column_mapping,
+                )
+                loss = svi.step(fs2dim, data=batch,)
+                if j % verbosity == 0:
+                    logging.info(f"On iteration {j}, -log p(x) = {loss}")
+                losses.append(loss)
+                j += 1
+        # if we iterated through an empty generator, something went wrong
+        if j > 0:
+            return (torch.tensor(losses), fs2dim)
+        else:
+            raise ValueError(f"At least one of the generators returned by {data} was empty!")
+
+    @classmethod
+    def learn(
+        cls,
+        dimensions: Iterable[dimensions.FactorDimensions],
+        data: Union[Iterable, pd.DataFrame],
         train_options: Optional[dict]=None,
+        column_mapping: Mapping[str, str]=dict(),
     ):
         """Learns parameters of factors in a factor graph from data.
 
@@ -477,16 +538,25 @@ class DiscreteFactorGraph(FactorGraph):
         + `data`: `pandas.DataFrame`. Each column must be equal length and correspond to observations
             of the variable given in the header of the column.
         """
-        variables = [d.get_variables() for d in dimensions]
-        dims = [d.get_dimensions() for d in dimensions]
-        data = transform._df2od_torch(data, variables, dims)
-        fs2dim = collections.OrderedDict((d.get_factor_spec() for d in dimensions))
-        losses = mle_train(
-            discrete_factor_model,
-            (fs2dim,),
-            dict(data=data),
-            train_options=train_options,
-        )
+        if type(data) == pd.DataFrame:
+            (fs2dim, data) = cls._transform_dims_data(
+                dimensions,
+                data,
+                column_mapping=column_mapping,
+            )
+            losses = cls._mle_train(
+                fs2dim,
+                data,
+                train_options=train_options,
+            )
+        # TODO: test to ensure that the passed Iterable *is* a generator better
+        else:  # is a generator
+            (losses, fs2dim) = cls._mle_train_from_generator(
+                dimensions,
+                data,
+                train_options=train_options,
+                column_mapping=column_mapping,  # calls _transform_dims_data internally
+            )
         factors = [
             DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, pyro.param(make_factor_name(fs)))
             for (fs, dim) in fs2dim.items()
