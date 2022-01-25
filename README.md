@@ -13,8 +13,8 @@ To use the latest cerulean development Docker image (requires Docker be installe
 - Open a command prompt
 - `docker login dtr.collab.cra.com --username=<your_dtr_username>`
     - Use your DTR access token as your password
-- `docker pull dtr.collab.cra.com/proper-fm/cerulean:latest`
-- `docker run -it dtr.collab.cra.com/proper-fm/cerulean:latest`
+- `docker pull dtr.collab.cra.com/proper-fm/cerulean:<tag>`
+- `docker run -it dtr.collab.cra.com/proper-fm/cerulean:<tag>`
 - `conda activate proper-fm`
 
 To install and work on this package locally:
