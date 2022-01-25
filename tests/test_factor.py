@@ -3,9 +3,11 @@ import logging
 
 import cerulean
 import numpy as np
+import os
 import pandas as pd
 import pyro
 import pytest
+import tempfile
 import torch
 
 
@@ -130,6 +132,84 @@ def test_link():
     joint = graph_1.query("ab")
     logging.info(f"Joint distribution table *without* constraint:\n{joint.table}")
 
+@pytest.mark.factor
+@pytest.mark.slow
+def test_save_load():
+    fs = "ab"
+    dim = (2, 3)
+
+    data = pd.DataFrame({
+        "a": [1, 0], 
+        "b": [1, 1]
+    })
+
+    factory = cerulean.dimensions.DimensionsFactory("a", "b")
+    factory("a", dim[0])
+    factory("b", dim[1])
+    
+    graph, _ = cerulean.factor.DiscreteFactorGraph.learn(
+        (factory(("a",)), factory(("b",)), factory(("a", "b"))),
+        data,
+        train_options={"num_iterations": 2}
+    )
+    
+    cwd = os.getcwd()
+    
+    try:
+        td = tempfile.TemporaryDirectory()
+        os.chdir(td.name)
+        fname = graph.save()
+        assert os.path.exists(fname)
+        fname2 = 'test.pkl'
+        graph.save(fname2)
+        assert os.path.exists(fname2)
+        
+        g1 = cerulean.factor.DiscreteFactorGraph.load(fname)
+        g2 = cerulean.factor.DiscreteFactorGraph.load(fname2)
+        
+        gf = graph.factors.values()
+        g1f = g1.factors.values()
+        g2f = g2.factors.values()
+        
+        assert all(f1.equal(f2) for (f1,f2) in zip([g.table for g in g1f], [g.table for g in g2f]))
+        assert all(fs1 == fs2 for (fs1,fs2) in zip([g.fs for g in g1f], [g.fs for g in g2f]))
+        assert g1.ts == g2.ts
+        assert g1._INFERENCE_CACHE_SIZE == g2._INFERENCE_CACHE_SIZE
+        assert g1._CACHED_INTERMEDIATES == g2._CACHED_INTERMEDIATES
+        assert g1._CONTRACT_EXPR == g2._CONTRACT_EXPR
+        
+        assert all(f1.equal(f2) for (f1,f2) in zip([g.table for g in gf], [g.table for g in g1f]))
+        assert all(fs1 == fs2 for (fs1,fs2) in zip([g.fs for g in gf], [g.fs for g in g1f]))
+        assert graph.ts == g1.ts
+        assert graph._INFERENCE_CACHE_SIZE == g1._INFERENCE_CACHE_SIZE
+        assert graph._CACHED_INTERMEDIATES == g1._CACHED_INTERMEDIATES
+        assert graph._CONTRACT_EXPR == g1._CONTRACT_EXPR
+        
+        gq = graph.query('ab')
+        g1q = g1.query('ab')
+        g2q = g2.query('ab')
+        
+        assert gq.table.equal(g1q.table)
+        assert gq.fs == g1q.fs
+        assert gq.table.equal(g2q.table)
+        assert gq.fs == g2q.fs
+        
+        os.chdir(cwd)
+        td.cleanup()
+    except BaseException as e:
+        logging.warning("tempdir cleanup failed")
+    finally:
+        os.chdir(cwd)
+    
+@pytest.mark.factor
+@pytest.mark.slow
+def test_load():
+    graph = cerulean.factor.DiscreteFactorGraph.load('tests/DiscreteFactorGraph_test.pkl')
+    q = graph.query('ab')
+    t = torch.tensor([[0.16216546, 0.1756691, 0.16216546], [0.16216546, 0.1756691, 0.16216546]])
+    assert q.table.equal(t)
+    assert q.fs == 'ab'
+    
 
 class MockDataGenerator:
 
@@ -181,7 +261,7 @@ def get_data_generator(
     )
 
 
-@pytest.mark.train
+@pytest.mark.training
 @pytest.mark.slow
 @pytest.mark.factor
 def test_train_graph_from_generator():
