@@ -571,6 +571,7 @@ class DiscreteFactorGraph(FactorGraph):
         *factors: DiscreteFactor,
         ts: Optional[datetime.datetime]=None,
         inference_cache_size: int=1,
+        precompute_path=True,
     ):
         self.ts = ts
         self.factors = collections.OrderedDict({
@@ -592,7 +593,11 @@ class DiscreteFactorGraph(FactorGraph):
         self.reset_inference_cache()
 
         # precompute elimination paths
-        self.build_contract_expr()
+        if precompute_path:
+            self.build_contract_expr()
+        else:
+            logging.warning("No contraction path computed!")
+            logging.warning("Must compute contraction path before inference!")
 
     def build_contract_expr(
         self,
