@@ -4,6 +4,7 @@ import collections
 import datetime
 import functools
 import logging
+import multiprocess as mp
 from typing import (
     Callable,
     Iterable,
@@ -13,9 +14,9 @@ from typing import (
     Union
 )
 
-import mypy
 import numpy as np
 import opt_einsum
+import os
 import pandas as pd
 import pyro
 import pyro.distributions as dist
@@ -26,7 +27,6 @@ from . import (
     dimensions,
     transform
 )
-
 
 def discrete_marginal(
     contract_op,
@@ -485,7 +485,7 @@ class DiscreteFactorGraph(FactorGraph):
         dimensions: Iterable[dimensions.FactorDimensions],
         data: Callable,
         train_options: Optional[dict]=dict(),
-        column_mapping: Mapping[str, str]=dict(),
+        column_mapping: Mapping[str, str]=dict()
     ):
         """
         Trains an MLE discrete factor model using a data generator. 
@@ -494,6 +494,41 @@ class DiscreteFactorGraph(FactorGraph):
         emits `pd.DataFrame`s.
 
         """
+        losses=[]
+        fs2dim = None
+        
+        def callback(val):
+            nonlocal fs2dim
+            
+            losses.extend(val[0])
+            fs2dim = val[1]
+            
+        def error_callback(e):
+            logging.warn(f'{e}')
+        
+        worker_ids = range(os.cpu_count())
+        with mp.Pool(os.cpu_count()) as pool:
+            for id in worker_ids:
+                pool.apply_async(
+                    cls._mle_train_from_generator_distribute,
+                    (id, dimensions, data, train_options, column_mapping,),
+                    callback=callback,
+                    error_callback=error_callback
+                )
+            pool.close()
+            pool.join()
+        
+        return (losses, fs2dim)
+
+    @classmethod
+    def _mle_train_from_generator_distribute(
+        cls,
+        worker_id:int, 
+        dimensions: Iterable[dimensions.FactorDimensions],
+        data: Callable,
+        train_options: Optional[dict]=dict(),
+        column_mapping: Mapping[str, str]=dict()
+    ):
         train_options = train_options or dict()
         num_epochs = train_options.get("num_epochs", 1)
         svi = _setup_svi(discrete_factor_model, train_options=train_options,)
@@ -519,15 +554,17 @@ class DiscreteFactorGraph(FactorGraph):
                 j += 1
         # if we iterated through an empty generator, something went wrong
         if j > 0:
-            return (torch.tensor(losses), fs2dim)
+            tup = [(fs, dim, pyro.param(make_factor_name(fs))) for (fs, dim) in fs2dim.items()]            
+            return (losses, tup)
         else:
             raise ValueError(f"At least one of the generators returned by {data} was empty!")
-
+        
+        
     @classmethod
     def learn(
         cls,
         dimensions: Iterable[dimensions.FactorDimensions],
-        data: Union[Iterable, pd.DataFrame],
+        data: Union[Callable, pd.DataFrame],
         train_options: Optional[dict]=None,
         column_mapping: Mapping[str, str]=dict(),
     ):
@@ -549,21 +586,24 @@ class DiscreteFactorGraph(FactorGraph):
                 data,
                 train_options=train_options,
             )
+            factors = [
+                DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, pyro.param(make_factor_name(fs)))
+                for (fs, dim) in fs2dim.items()
+            ]
         # TODO: test to ensure that the passed Iterable *is* a generator better
         else:  # is a generator
             (losses, fs2dim) = cls._mle_train_from_generator(
                 dimensions,
                 data,
                 train_options=train_options,
-                column_mapping=column_mapping,  # calls _transform_dims_data internally
+                column_mapping=column_mapping  # calls _transform_dims_data internally
             )
-        factors = [
-            DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, pyro.param(make_factor_name(fs)))
-            for (fs, dim) in fs2dim.items()
-        ]
+            factors = [
+                DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, param) for (fs, dim, param) in fs2dim
+            ]
+            
         new_factor_graph = cls(*factors, ts=None)
         new_factor_graph._learned = True
-        assert new_factor_graph.fs2dim == fs2dim
         return (new_factor_graph, losses)
 
     def __init__(
