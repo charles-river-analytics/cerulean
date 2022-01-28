@@ -17,16 +17,18 @@ def _get_pairwise_constraint_table(
     """
     if relation == "==":
         the_tensor = torch.zeros(dim)
-        the_tensor[
-            range(len(the_tensor)),
-            range(len(the_tensor))
-        ] = torch.tensor(1.0)
+        # the_tensor[
+        #     range(len(the_tensor)),
+        #     range(len(the_tensor))
+        # ] = torch.tensor(1.0)
+        the_tensor.fill_diagonal_(1.0)
     elif relation == "!=":
         the_tensor = torch.ones(dim)
-        the_tensor[
-            range(len(the_tensor)),
-            range(len(the_tensor))
-        ] = torch.tensor(0.0)
+        # the_tensor[
+        #     range(len(the_tensor)),
+        #     range(len(the_tensor))
+        # ] = torch.tensor(0.0)
+        the_tensor.fill_diagonal_(0.0)
     elif relation == "<":
         the_tensor = torch.ones(dim).triu(diagonal=1,)
     elif relation == ">":

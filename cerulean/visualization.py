@@ -1,6 +1,8 @@
 
 import pathlib
+from typing import Union
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -20,6 +22,8 @@ def _probability_compare_1d(
     true: np.ndarray,
     pred: np.ndarray,
     outpath,
+    labels,
+    log,
 ):
     assert len(true) == len(pred)
     labels = np.arange(len(true))
@@ -56,30 +60,49 @@ def _probability_compare_2d(
     true: np.ndarray,
     pred: np.ndarray,
     outpath,
+    labels,
+    log,
 ):
     var_1, var_2 = tuple(x for x in variables)
-    fig, axes = plt.subplots(2, 1, figsize=SINGLE_FIGSIZE)
+    fig, axes = plt.subplots(2, 1, )#figsize=SINGLE_FIGSIZE)
     axes = axes.flatten()
-    axes[0].imshow(
-        true,
-        interpolation="none",
-        cmap="autumn",
-        aspect="auto",
-    )
-    true_display = axes[1].imshow(
-        pred,
-        interpolation="none",
-        cmap="autumn",
-        aspect="auto",
-    )
+    if not log:
+        axes[0].imshow(
+            true,
+            interpolation="none",
+            cmap="autumn",
+            aspect="auto",
+        )
+        true_display = axes[1].imshow(
+            pred,
+            interpolation="none",
+            cmap="autumn",
+            aspect="auto",
+        )
+    else:
+        norm = matplotlib.colors.LogNorm()
+        axes[0].imshow(
+            true,
+            interpolation="none",
+            cmap="autumn",
+            aspect="auto",
+            norm=norm,
+        )
+        true_display = axes[1].imshow(
+            pred,
+            interpolation="none",
+            cmap="autumn",
+            aspect="auto",
+            norm=norm,
+        )
     axes[0].set_xticks([])
     axes[0].set_yticks(range(true.shape[0]))
     axes[1].set_yticks(range(true.shape[0]))
     axes[1].set_xticks(range(true.shape[1]))
 
-    axes[0].set_ylabel(f"Level of {var_1}", fontsize=FONTSIZE)
-    axes[1].set_ylabel(f"Level of {var_1}", fontsize=FONTSIZE)
-    axes[1].set_xlabel(f"Level of {var_2}", fontsize=FONTSIZE)
+    axes[0].set_ylabel(f"Level of {var_1}", )#fontsize=FONTSIZE)
+    axes[1].set_ylabel(f"Level of {var_1}", )#fontsize=FONTSIZE)
+    axes[1].set_xlabel(f"Level of {var_2}", )#fontsize=FONTSIZE)
 
     cbar = fig.colorbar(
         true_display,
@@ -93,21 +116,22 @@ def _probability_compare_2d(
     axes[0].set_title("Empirical")
     axes[1].set_title("Predicted")
 
-    for ax in axes:
-        ax.set_xticks(np.arange(-.5, true.shape[1], 1), minor=True)
-        ax.set_yticks(np.arange(-.5, true.shape[0], 1), minor=True)
-        ax.grid(
-            which="minor",
-            color="k",
-            linestyle="-",
-            linewidth=2,
-        )
-
-    for (j,i), label in np.ndenumerate(true):
-        axes[0].text(i, j, round(label, 3), ha='center', va='center')
-    for (j,i), label in np.ndenumerate(pred):
-        axes[1].text(i, j, round(label, 3), ha='center', va='center')
-
+    if labels:
+        for ax in axes:
+            ax.set_xticks(np.arange(-.5, true.shape[1], 1), minor=True)
+            ax.set_yticks(np.arange(-.5, true.shape[0], 1), minor=True)
+            ax.grid(
+                which="minor",
+                color="k",
+                linestyle="-",
+                linewidth=2,
+            )
+        for (j,i), label in np.ndenumerate(true):
+            axes[0].text(i, j, round(label, 3), ha='center', va='center')
+        for (j,i), label in np.ndenumerate(pred):
+            axes[1].text(i, j, round(label, 3), ha='center', va='center')
+    if outpath is False:
+        return (fig, axes)
     plt.savefig(outpath / f"{variables}-marginal.png")
     plt.close()
 
@@ -136,7 +160,9 @@ def probability_compare(
     fg: factor.DiscreteFactorGraph,
     variables: str,
     true: np.ndarray,
-    outpath=DEFAULT_OUTPATH,
+    outpath: Union[str, bool]=DEFAULT_OUTPATH,
+    labels: bool=True,
+    log: bool=False,
 ):
     """
     Plot univariate and bivariate probability distributions and compare them 
@@ -158,6 +184,6 @@ def probability_compare(
     preds = prob_factor.table.numpy()
 
     if len_variables == 1:
-        _probability_compare_1d(variables, true, preds, outpath)
+        return _probability_compare_1d(variables, true, preds, outpath, labels, log,)
     else:
-        _probability_compare_2d(variables, true, preds, outpath)
+        return _probability_compare_2d(variables, true, preds, outpath, labels, log,)

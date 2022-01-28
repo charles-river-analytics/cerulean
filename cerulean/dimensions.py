@@ -1,10 +1,14 @@
 
-from typing import Optional, Union
+from typing import Mapping, Optional, Union
 
 import mypy
 from typing import Tuple
 
 from . import transform
+
+
+def _mapping_invert(m: Mapping) -> dict:
+    return {v : k for (k, v) in m.items()}
 
 
 class Dimensions:
@@ -138,6 +142,12 @@ class DimensionsFactory:
         by `opt_einsum`.
         """
         return self.names2strings
+
+    def mapping_inverse(self,) -> dict[str, str]:
+        """
+        Returns the mapping from string representations used by `opt_einsum` to variable names.
+        """
+        return _mapping_invert(self.names2strings)
 
     def get_variable(self, name: str) -> VariableDimensions:
         """
