@@ -16,12 +16,12 @@ from typing import (
 
 import numpy as np
 import opt_einsum
-import os
 import pandas as pd
 import pyro
 import pyro.distributions as dist
 import pyro.distributions.constraints as constraints
 import torch
+import traceback
 
 from . import (
     dimensions,
@@ -485,7 +485,8 @@ class DiscreteFactorGraph(FactorGraph):
         dimensions: Iterable[dimensions.FactorDimensions],
         data: Callable,
         train_options: Optional[dict]=dict(),
-        column_mapping: Mapping[str, str]=dict()
+        column_mapping: Mapping[str, str]=dict(),
+        num_workers:int=1
     ):
         """
         Trains an MLE discrete factor model using a data generator. 
@@ -504,19 +505,25 @@ class DiscreteFactorGraph(FactorGraph):
             fs2dim = val[1]
             
         def error_callback(e):
-            logging.warn(f'{e}')
+            tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
+            logging.error(''.join(tb_str))
         
-        worker_ids = range(os.cpu_count())
-        with mp.Pool(os.cpu_count()) as pool:
-            for id in worker_ids:
-                pool.apply_async(
-                    cls._mle_train_from_generator_distribute,
-                    (id, dimensions, data, train_options, column_mapping,),
-                    callback=callback,
-                    error_callback=error_callback
-                )
-            pool.close()
-            pool.join()
+        if num_workers == 1:
+            losses,fs2dim = cls._mle_train_from_generator_distribute(
+                0, dimensions, data, train_options, column_mapping)
+        else:
+            worker_ids = range(num_workers)
+            ctx = mp.get_context('spawn')
+            with ctx.Pool(num_workers) as pool:
+                for id in worker_ids:
+                    pool.apply_async(
+                        cls._mle_train_from_generator_distribute,
+                        (id, dimensions, data, train_options, column_mapping,),
+                        callback=callback,
+                        error_callback=error_callback
+                    )
+                pool.close()
+                pool.join()
         
         return (losses, fs2dim)
 
@@ -540,7 +547,7 @@ class DiscreteFactorGraph(FactorGraph):
         for epoch in range(num_epochs):
             if j % verbosity == 0:
                 logging.info(f"On epoch {epoch}")
-            data_generator = data()
+            data_generator = data(worker_id)
             for batch in data_generator:  # NOTE: assuming that each batch is a pd.DataFrame
                 (fs2dim, batch) = cls._transform_dims_data(
                     dimensions,
@@ -567,6 +574,7 @@ class DiscreteFactorGraph(FactorGraph):
         data: Union[Callable, pd.DataFrame],
         train_options: Optional[dict]=None,
         column_mapping: Mapping[str, str]=dict(),
+        num_workers: int=1
     ):
         """Learns parameters of factors in a factor graph from data.
 
@@ -574,6 +582,10 @@ class DiscreteFactorGraph(FactorGraph):
             related by that factor.
         + `data`: `pandas.DataFrame`. Each column must be equal length and correspond to observations
             of the variable given in the header of the column.
+        + `num_workers`: (default 1)  the number of workers used during learning *used only if 
+             the data is a `Callable` that returns an iterable*.  The iterable itself **must** 
+             know the number of workers so that it can split up its data between each worker
+             appropriately. 
         """
         if type(data) == pd.DataFrame:
             (fs2dim, data) = cls._transform_dims_data(
@@ -596,7 +608,8 @@ class DiscreteFactorGraph(FactorGraph):
                 dimensions,
                 data,
                 train_options=train_options,
-                column_mapping=column_mapping  # calls _transform_dims_data internally
+                column_mapping=column_mapping,  # calls _transform_dims_data internally
+                num_workers=num_workers
             )
             factors = [
                 DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, param) for (fs, dim, param) in fs2dim
