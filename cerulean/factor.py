@@ -4,6 +4,7 @@ import collections
 import datetime
 import functools
 import logging
+import pickle
 import multiprocess as mp
 from typing import (
     Callable,
@@ -619,6 +620,18 @@ class DiscreteFactorGraph(FactorGraph):
         new_factor_graph._learned = True
         return (new_factor_graph, losses)
 
+    @classmethod
+    def load(cls, fname: str):
+        """
+        Loads and returns a DiscreteFactorGraph from a file saved using 
+        :func:`~cerulean.factor.DiscreteFactorGraph.save`.  It assumes
+        the filename is given relative to the current working directory.
+        """
+        with open(fname, 'rb') as f:
+            data = pickle.load(f)
+            loaded_cls = data['cls']
+            return loaded_cls(*data['factors'], ts=data['ts'], inference_cache_size=data['inference_cache_size'])
+    
     def __init__(
         self,
         *factors: DiscreteFactor,
@@ -647,6 +660,34 @@ class DiscreteFactorGraph(FactorGraph):
         # precompute elimination paths
         self.build_contract_expr()
 
+    def save(self, fname:str=None)->str:
+        """
+        Saves a DiscreteFactorGraph model to a file.  By default, this file is
+        named by the code block below, where the ``ts`` is either the timestamp
+        on the graph or now; if the ``fname`` parameter is provided, the
+        provided name is used.  Both are relative to the current working directory.
+        
+        .. code-block:: python
+            type(self).__name__ + '_' + ts.strftime('%Y%m%dT%H%M%S.%f') + '.pkl'
+            
+        This method saves the following fields using pickle:
+        * type(self)
+        * factors.values()
+        * ts
+        * the inference cache size
+        """
+        data = {
+            'cls':type(self), 
+            'factors':list(self.factors.values()), 
+            'ts':self.ts, 
+            'inference_cache_size':self.get_inference_cache_size()}
+        ts = self.ts if self.ts else datetime.datetime.utcnow()
+        filename = fname if fname else type(self).__name__ + '_' + ts.strftime('%Y%m%dT%H%M%S.%f') + '.pkl'
+        with open(filename, 'wb') as f:
+            pickle.dump(data, f)
+        
+        return filename
+        
     def build_contract_expr(
         self,
         result_spec: str="",
