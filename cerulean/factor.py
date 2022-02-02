@@ -5,6 +5,7 @@ import datetime
 import functools
 import logging
 import pickle
+import multiprocess as mp
 from typing import (
     Callable,
     Iterable,
@@ -14,7 +15,6 @@ from typing import (
     Union
 )
 
-import mypy
 import numpy as np
 import opt_einsum
 import pandas as pd
@@ -22,12 +22,12 @@ import pyro
 import pyro.distributions as dist
 import pyro.distributions.constraints as constraints
 import torch
+import traceback
 
 from . import (
     dimensions,
     transform
 )
-
 
 def discrete_marginal(
     contract_op,
@@ -487,6 +487,7 @@ class DiscreteFactorGraph(FactorGraph):
         data: Callable,
         train_options: Optional[dict]=dict(),
         column_mapping: Mapping[str, str]=dict(),
+        num_workers:int=1
     ):
         """
         Trains an MLE discrete factor model using a data generator. 
@@ -495,6 +496,47 @@ class DiscreteFactorGraph(FactorGraph):
         emits `pd.DataFrame`s.
 
         """
+        losses=[]
+        fs2dim = None
+        
+        def callback(val):
+            nonlocal fs2dim
+            
+            losses.extend(val[0])
+            fs2dim = val[1]
+            
+        def error_callback(e):
+            tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
+            logging.error(''.join(tb_str))
+        
+        if num_workers == 1:
+            losses,fs2dim = cls._mle_train_from_generator_distribute(
+                0, dimensions, data, train_options, column_mapping)
+        else:
+            worker_ids = range(num_workers)
+            ctx = mp.get_context('spawn')
+            with ctx.Pool(num_workers) as pool:
+                for id in worker_ids:
+                    pool.apply_async(
+                        cls._mle_train_from_generator_distribute,
+                        (id, dimensions, data, train_options, column_mapping,),
+                        callback=callback,
+                        error_callback=error_callback
+                    )
+                pool.close()
+                pool.join()
+        
+        return (losses, fs2dim)
+
+    @classmethod
+    def _mle_train_from_generator_distribute(
+        cls,
+        worker_id:int, 
+        dimensions: Iterable[dimensions.FactorDimensions],
+        data: Callable,
+        train_options: Optional[dict]=dict(),
+        column_mapping: Mapping[str, str]=dict()
+    ):
         train_options = train_options or dict()
         num_epochs = train_options.get("num_epochs", 1)
         svi = _setup_svi(discrete_factor_model, train_options=train_options,)
@@ -506,7 +548,7 @@ class DiscreteFactorGraph(FactorGraph):
         for epoch in range(num_epochs):
             if j % verbosity == 0:
                 logging.info(f"On epoch {epoch}")
-            data_generator = data()
+            data_generator = data(worker_id)
             for batch in data_generator:  # NOTE: assuming that each batch is a pd.DataFrame
                 (fs2dim, batch) = cls._transform_dims_data(
                     dimensions,
@@ -520,17 +562,20 @@ class DiscreteFactorGraph(FactorGraph):
                 j += 1
         # if we iterated through an empty generator, something went wrong
         if j > 0:
-            return (torch.tensor(losses), fs2dim)
+            tup = [(fs, dim, pyro.param(make_factor_name(fs))) for (fs, dim) in fs2dim.items()]            
+            return (losses, tup)
         else:
             raise ValueError(f"At least one of the generators returned by {data} was empty!")
-
+        
+        
     @classmethod
     def learn(
         cls,
         dimensions: Iterable[dimensions.FactorDimensions],
-        data: Union[Iterable, pd.DataFrame],
+        data: Union[Callable, pd.DataFrame],
         train_options: Optional[dict]=None,
         column_mapping: Mapping[str, str]=dict(),
+        num_workers: int=1
     ):
         """Learns parameters of factors in a factor graph from data.
 
@@ -538,6 +583,10 @@ class DiscreteFactorGraph(FactorGraph):
             related by that factor.
         + `data`: `pandas.DataFrame`. Each column must be equal length and correspond to observations
             of the variable given in the header of the column.
+        + `num_workers`: (default 1)  the number of workers used during learning *used only if 
+             the data is a `Callable` that returns an iterable*.  The iterable itself **must** 
+             know the number of workers so that it can split up its data between each worker
+             appropriately. 
         """
         if type(data) == pd.DataFrame:
             (fs2dim, data) = cls._transform_dims_data(
@@ -550,6 +599,10 @@ class DiscreteFactorGraph(FactorGraph):
                 data,
                 train_options=train_options,
             )
+            factors = [
+                DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, pyro.param(make_factor_name(fs)))
+                for (fs, dim) in fs2dim.items()
+            ]
         # TODO: test to ensure that the passed Iterable *is* a generator better
         else:  # is a generator
             (losses, fs2dim) = cls._mle_train_from_generator(
@@ -557,14 +610,14 @@ class DiscreteFactorGraph(FactorGraph):
                 data,
                 train_options=train_options,
                 column_mapping=column_mapping,  # calls _transform_dims_data internally
+                num_workers=num_workers
             )
-        factors = [
-            DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, pyro.param(make_factor_name(fs)))
-            for (fs, dim) in fs2dim.items()
-        ]
+            factors = [
+                DiscreteFactor(f"DiscreteFactor({fs})", fs, dim, param) for (fs, dim, param) in fs2dim
+            ]
+            
         new_factor_graph = cls(*factors, ts=None)
         new_factor_graph._learned = True
-        assert new_factor_graph.fs2dim == fs2dim
         return (new_factor_graph, losses)
 
     @classmethod
