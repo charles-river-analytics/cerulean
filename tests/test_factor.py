@@ -171,7 +171,7 @@ def get_data_generator(
     the_min=-3.0,
     the_max=3.0,
 ):
-    return lambda: MockDataGenerator(
+    return lambda id=0: MockDataGenerator(
         variables,
         batch_size=batch_size,
         num_batches=num_batches,
