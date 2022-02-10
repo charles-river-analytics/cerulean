@@ -5,7 +5,7 @@ import datetime
 import functools
 import logging
 import pickle
-import multiprocess as mp
+import multiprocessing as mp
 from typing import (
     Callable,
     Iterable,
