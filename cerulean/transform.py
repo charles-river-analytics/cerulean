@@ -131,7 +131,7 @@ def to_stationary(
 def _continuous_to_auto_variable_level(
     continuous_df: pd.DataFrame,
     n_bins: int
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, np.ndarray]:
     """
     Computes a discretization inferring min and max from data.
     """
@@ -141,7 +141,7 @@ def _continuous_to_auto_variable_level(
         the_freqs, the_bins = np.histogram(continuous_df[col], bins=n_bins)
         the_ixs = np.digitize(continuous_df[col].values, the_bins, right=True)
         to_df[col] = the_ixs
-    return pd.DataFrame(to_df)
+    return pd.DataFrame(to_df), the_bins
 
 
 def _continuous_to_specific_variable_level(
@@ -149,7 +149,7 @@ def _continuous_to_specific_variable_level(
     n_bins: int,
     the_min: float,
     the_max: float
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, np.ndarray]:
     """
     Computes a discretization with a user-specified min and max.
     """
@@ -163,7 +163,7 @@ def _continuous_to_specific_variable_level(
         )
         the_ixs = np.digitize(continuous_df[col].values, the_bins, right=True)
         to_df[col] = the_ixs
-    return pd.DataFrame(to_df)
+    return pd.DataFrame(to_df), the_bins
 
 
 def continuous_to_variable_level(
@@ -171,7 +171,7 @@ def continuous_to_variable_level(
     n_cutpoints: int,
     the_min: Optional[float]=None,
     the_max: Optional[float]=None,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, np.ndarray]:
     """
     Discretizes a collection of continuous rvs (represented via samples in 
     `pd.DataFrame`) into a collection of discrete rvs each of which has support 

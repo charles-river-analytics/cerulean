@@ -123,12 +123,12 @@ def test_inference_with_stationary():
     logging.info(f"Stationarized records: {stationary}")
 
     n_cutpoints = 11
-    discrete_stationary = transform.continuous_to_variable_level(
+    discrete_stationary, bins = transform.continuous_to_variable_level(
         stationary,
         n_cutpoints,
     )
 
-    discrete_stationary_minmax = transform.continuous_to_variable_level(
+    discrete_stationary_minmax, minmax_bins = transform.continuous_to_variable_level(
         stationary,
         n_cutpoints,
         -0.02,

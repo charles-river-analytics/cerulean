@@ -145,7 +145,7 @@ def make_evidence_ts(n_ts:int, n_cutpoints: int):
     stationarized_paths_df.columns = ["a", "b", "c", "d"]
     the_min = stationarized_paths_df.values.min() * 1.1
     the_max = stationarized_paths_df.values.max() * 1.1
-    evidence = cerulean.transform.continuous_to_variable_level(
+    evidence, bins = cerulean.transform.continuous_to_variable_level(
         stationarized_paths_df,
         n_cutpoints=n_cutpoints,
         the_min=the_min,

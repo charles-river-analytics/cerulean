@@ -320,7 +320,7 @@ class MockDataGenerator:
                 self.n_cutpoints,
                 the_min=self.the_min,
                 the_max=self.the_max,
-            )
+            )[0]  # second element is bins
 
 
 def get_data_generator(

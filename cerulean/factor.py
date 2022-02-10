@@ -39,8 +39,7 @@ def discrete_marginal(
     This method computes 
     :math:`p(V, E = e)`, then computes
     :math:`p(V | E = e) = p(V, E = e) / p(E = e)`. Note that the complexity of this method
-    scales as :math:`\mathcal{O}(D^{|V|})` where :math:`D` is the maximum variable
-    support cardinality.
+    scales as :math:`\mathcal{O}(D^{|V|})` where :math:`D` is the cardinality of the largest intermediate tensor.
     """
     unscaled = contract_op(*tensors)
     return (unscaled / torch.sum(unscaled))

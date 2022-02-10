@@ -69,7 +69,7 @@ def main():
     # you also need to choose how many bins to have.
     n_bins = 10
     n_cutpoints = n_bins + 1
-    discrete_stationary = cerulean.transform.continuous_to_variable_level(
+    discrete_stationary, discrete_stationary_bins = cerulean.transform.continuous_to_variable_level(
         stationary,
         n_cutpoints,
         the_max=the_max,
