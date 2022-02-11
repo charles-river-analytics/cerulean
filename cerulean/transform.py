@@ -49,6 +49,44 @@ def _df2od_torch(
     return out
 
 
+class _Transform:
+    """
+    Bundles a transform with a name. 
+    Not recommended for public use as the API could change at any time.
+    """
+
+    def __init__(self, name, transform,):
+        self.name = name
+        self._transform = transform
+
+    def __call__(self, *args, **kwargs):
+        return self._transform(*args, **kwargs)
+
+
+_TRANSFORMS = {
+    "vector": {
+        "diff": {
+            "f": lambda x, y: x[1:] - y[:-1],
+            "f_inv": lambda dx, y: y[:-1] + dx
+        },
+        "logdiff": {
+            "f": lambda x, y: 100.0 * (np.log(x[1:]) - np.log(y[:-1])),
+            "f_inv": lambda dx, y: np.exp(dx / 100.0 + np.log(y[:-1]))
+        }
+    },
+    "scalar": {
+        "diff": {
+            "f": lambda x, y: x - y,
+            "f_inv": lambda dx, y: y + dx
+        },
+        "logdiff": {
+            "f": lambda x, y: 100.0 * (np.log(x) - np.log(y)),
+            "f_inv": lambda dx, y: np.exp(dx / 100.0 + np.log(y))
+        }
+    }
+}
+
+
 def make_stationarizer(
     method: StationaryTransform
 ) -> tuple[Callable[[pd.DataFrame, pd.DataFrame], pd.DataFrame],...]:
@@ -66,12 +104,8 @@ def make_stationarizer(
         forward method will compute 100 * the first log difference between the records and the
         centralized record. 
     """
-    if method == "diff":
-        f = lambda x, y: x[1:] - y[:-1]
-        f_inv = lambda dx, y: y[:-1] + dx
-    else:
-        f = lambda x, y: 100.0 * (np.log(x[1:]) - np.log(y[:-1]))
-        f_inv = lambda dx, y: np.exp(dx / 100.0 + np.log(y[:-1]))
+    f = _TRANSFORMS["vector"][method]["f"]
+    f_inv = _TRANSFORMS["vector"][method]["f_inv"]
 
     def stationarizer(
         records: pd.DataFrame,
@@ -99,7 +133,7 @@ def make_stationarizer(
         df.index = dx.index
         return df
 
-    return (stationarizer, inverse_stationarizer)
+    return (_Transform(method, stationarizer), _Transform(method, inverse_stationarizer))
 
 
 def to_stationary(
@@ -131,7 +165,7 @@ def to_stationary(
 def _continuous_to_auto_variable_level(
     continuous_df: pd.DataFrame,
     n_bins: int
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, np.ndarray]:
     """
     Computes a discretization inferring min and max from data.
     """
@@ -141,7 +175,7 @@ def _continuous_to_auto_variable_level(
         the_freqs, the_bins = np.histogram(continuous_df[col], bins=n_bins)
         the_ixs = np.digitize(continuous_df[col].values, the_bins, right=True)
         to_df[col] = the_ixs
-    return pd.DataFrame(to_df)
+    return pd.DataFrame(to_df), the_bins
 
 
 def _continuous_to_specific_variable_level(
@@ -149,7 +183,7 @@ def _continuous_to_specific_variable_level(
     n_bins: int,
     the_min: float,
     the_max: float
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, np.ndarray]:
     """
     Computes a discretization with a user-specified min and max.
     """
@@ -163,7 +197,7 @@ def _continuous_to_specific_variable_level(
         )
         the_ixs = np.digitize(continuous_df[col].values, the_bins, right=True)
         to_df[col] = the_ixs
-    return pd.DataFrame(to_df)
+    return pd.DataFrame(to_df), the_bins
 
 
 def continuous_to_variable_level(
@@ -171,7 +205,7 @@ def continuous_to_variable_level(
     n_cutpoints: int,
     the_min: Optional[float]=None,
     the_max: Optional[float]=None,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, np.ndarray]:
     """
     Discretizes a collection of continuous rvs (represented via samples in 
     `pd.DataFrame`) into a collection of discrete rvs each of which has support 
@@ -197,6 +231,19 @@ def continuous_to_variable_level(
             the_max
         )
 
+
+def _stationary_to_nonstationary_bins(inverse_stationarizer, centralized, bins: np.ndarray) -> np.ndarray:
+    """
+    Transforms bins according to an inverse stationarizer and a centralized value.
+
+    Bins are transformed according to `bins <- inverse_stationarizer(bins, centralized)`.
+    """
+    the_inv = _Transform(
+        inverse_stationarizer.name,
+        _TRANSFORMS["scalar"][inverse_stationarizer.name]["f_inv"]
+    )
+    return the_inv(bins, centralized)
+    
 
 def get_names2strings(*names: str) -> dict[str, str]:
     """

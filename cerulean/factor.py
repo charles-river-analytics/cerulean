@@ -5,7 +5,7 @@ import datetime
 import functools
 import logging
 import pickle
-import multiprocess as mp
+import multiprocessing as mp
 from typing import (
     Callable,
     Iterable,
@@ -39,8 +39,7 @@ def discrete_marginal(
     This method computes 
     :math:`p(V, E = e)`, then computes
     :math:`p(V | E = e) = p(V, E = e) / p(E = e)`. Note that the complexity of this method
-    scales as :math:`\mathcal{O}(D^{|V|})` where :math:`D` is the maximum variable
-    support cardinality.
+    scales as :math:`\mathcal{O}(D^{|V|})` where :math:`D` is the cardinality of the largest intermediate tensor.
     """
     unscaled = contract_op(*tensors)
     return (unscaled / torch.sum(unscaled))
@@ -637,6 +636,7 @@ class DiscreteFactorGraph(FactorGraph):
         *factors: DiscreteFactor,
         ts: Optional[datetime.datetime]=None,
         inference_cache_size: int=1,
+        precompute_path=True,
     ):
         self.ts = ts
         self.factors = collections.OrderedDict({
@@ -658,7 +658,11 @@ class DiscreteFactorGraph(FactorGraph):
         self.reset_inference_cache()
 
         # precompute elimination paths
-        self.build_contract_expr()
+        if precompute_path:
+            self.build_contract_expr()
+        else:
+            logging.warning("No contraction path computed!")
+            logging.warning("Must compute contraction path before inference!")
 
     def save(self, fname:str=None)->str:
         """

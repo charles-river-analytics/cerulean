@@ -1,7 +1,7 @@
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "INFO"
-log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_cli_format = "%(asctime)s [%(levelname)8s]\n%(message)s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 markers = [
     "slow: marks tests as slow",
@@ -9,7 +9,9 @@ markers = [
     "scaling: marks tests as involving a scaling study",
     "constraint: marks tests as explicitly testing constraint capabilities",
     "factor: marks test as explicitly testing factor capabilities",
-    "timing: marks test as explicitly involving wallclock time calculations"
+    "timing: marks test as explicitly involving wallclock time calculations",
+    "link: marks test as explicitly testing graph linkage",
+    "bins: marks test as explicitly testing discretization bin transformations"
 ]
 
 [build-system]

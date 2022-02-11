@@ -1,10 +1,14 @@
 
-from typing import Optional, Union
+from typing import Mapping, Optional, Union, Tuple
 
 import mypy
-from typing import Tuple
+import numpy as np
 
 from . import transform
+
+
+def _mapping_invert(m: Mapping) -> dict:
+    return {v : k for (k, v) in m.items()}
 
 
 class Dimensions:
@@ -60,12 +64,44 @@ class VariableDimensions(Dimensions):
     cardinality of the variable's support set.
     """
 
-    def __init__(self, var: str, dim: int):
+    def __init__(self, var: str, dim: int, bins: Optional[np.ndarray]=None,):
         """
         Takes a single string variable name and single integer representing that 
         variable's support set cardinality. 
         """
         super().__init__((var, dim))
+        self.bins = bins
+
+    def __str__(self,):
+        if type(self.bins) is not None:
+            num_bin_edges = len(self.bins)
+            _min = round(self.bins[0], 3)
+            _max = round(self.bins[-1], 3)
+            return f"VariableDimensions({self.variables}, bins (number = {num_bin_edges - 1}) are [{_min},...,{_max}])"
+        else:
+            return f"VariableDimensions({self.variables})"
+
+    def __getitem__(self, value):
+        if type(self.bins) is None:
+            raise TypeError("Can't convert value with nonexistent bins!")
+        if value >= self.bins[-1]:
+            return len(self.bins) - 1
+        elif value <= self.bins[0]:
+            return 0
+        else:
+            return np.digitize(value, self.bins, right=True)
+
+    def set_bins(self, bins):
+        assert type(bins) is np.ndarray
+        self.bins = bins
+
+    def transform_bins(self, transform_fn, base_value,):
+        """
+        Transforms bins in place using the `transform` and a `base_value`. 
+        The bins are transformed as `bins <- transform(bins, base_value)`.
+        """
+        if type(self.bins) is not None:
+            self.bins = transform._stationary_to_nonstationary_bins(transform_fn, base_value, self.bins)
 
     def __repr__(self,):
         return f"VariableDimensions({self.variables})"
@@ -116,13 +152,13 @@ class DimensionsFactory:
     def __call__(
         self,
         names: Union[str,tuple[str,...]],
-        n_cutpoints: Optional[int]=None
+        n_cutpoints: Optional[int]=None,
+        bins: Optional[np.ndarray]=None,
     ) -> Union[VariableDimensions, FactorDimensions]:
-        #return VariableDimensions(self.names2strings[name], n_cutpoints)
         if type(names) is str:
             if n_cutpoints is None:
                 raise ValueError("Must pass n_cutpoints for variable dimension generation!")
-            vd = VariableDimensions(self.names2strings[names], n_cutpoints)
+            vd = VariableDimensions(self.names2strings[names], n_cutpoints, bins=bins,)
             self.names2variables[names] = vd
 
         elif type(names) is tuple:
@@ -138,6 +174,12 @@ class DimensionsFactory:
         by `opt_einsum`.
         """
         return self.names2strings
+
+    def mapping_inverse(self,) -> dict[str, str]:
+        """
+        Returns the mapping from string representations used by `opt_einsum` to variable names.
+        """
+        return _mapping_invert(self.names2strings)
 
     def get_variable(self, name: str) -> VariableDimensions:
         """

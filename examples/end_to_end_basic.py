@@ -69,7 +69,7 @@ def main():
     # you also need to choose how many bins to have.
     n_bins = 10
     n_cutpoints = n_bins + 1
-    discrete_stationary = cerulean.transform.continuous_to_variable_level(
+    discrete_stationary, discrete_stationary_bins = cerulean.transform.continuous_to_variable_level(
         stationary,
         n_cutpoints,
         the_max=the_max,
@@ -84,7 +84,7 @@ def main():
     dim_factory = cerulean.dimensions.DimensionsFactory(*discrete_stationary.columns)
     # Register the variable's dimensionality with the dimension factory
     for location in discrete_stationary.columns:
-        dim_factory(location, n_cutpoints)
+        dim_factory(location, n_cutpoints, bins=discrete_stationary_bins,)
     # create the appropriate factor dimensions
     factor_dims = [
         dim_factory(loc_pair)
