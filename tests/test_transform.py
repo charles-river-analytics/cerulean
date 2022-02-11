@@ -173,4 +173,36 @@ def test_stationary_to_nonstationary_bins():
     _, f_inv = transform.make_stationarizer("logdiff")
     shift_lognormal_bins = transform._stationary_to_nonstationary_bins(f_inv, shift_mean, bins)
     logging.info(f"Converted bins to shfited lognormal with scale {shift_mean}:\n{shift_lognormal_bins}")
+
+
+@pytest.mark.bins
+def test_stationary_bins_in_dims():
+    # make initial bins
+    data = np.random.randn(1000)
+    num_bins = 25
+    _, bins = np.histogram(data, bins=num_bins)
+    # make some variables
+    factory = dimensions.DimensionsFactory("Var1", "Var2")
+    factory("Var1", num_bins)
+    factory("Var2", num_bins)
+    # set the bins
+    var1_dim = factory.get_variable("Var1")
+    var1_dim.set_bins(bins)
+    logging.info(f"Made variable dimension with bins: {var1_dim}")
+    # make a transform
+    _, f_inv = transform.make_stationarizer("logdiff")
+    # take the bins somewhere else
+    new_loc = 4.0
+    var1_dim.transform_bins(f_inv, new_loc)
+    logging.info(f"Shifted variable dimension's bins: {var1_dim}")
+    # see where the values lie
+    way_too_negative = -9.0
+    way_too_positive = 18.0
+    normalish = 3.95
+    low_bin = var1_dim[way_too_negative]
+    logging.info(f"Value {way_too_negative} maps to bin {low_bin}")
+    high_bin = var1_dim[way_too_positive]
+    logging.info(f"Value {way_too_positive} maps to bin {high_bin}")
+    normalish_bin = var1_dim[normalish]
+    logging.info(f"Value {way_too_positive} maps to bin {normalish_bin}")
     

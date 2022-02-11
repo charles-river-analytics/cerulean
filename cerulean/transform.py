@@ -235,7 +235,10 @@ def continuous_to_variable_level(
 def _stationary_to_nonstationary_bins(inverse_stationarizer, centralized, bins: np.ndarray) -> np.ndarray:
     """
     """
-    the_inv = _Transform(inverse_stationarizer.name, _TRANSFORMS["scalar"][inverse_stationarizer.name]["f_inv"])
+    the_inv = _Transform(
+        inverse_stationarizer.name,
+        _TRANSFORMS["scalar"][inverse_stationarizer.name]["f_inv"]
+    )
     return the_inv(bins, centralized)
     
 
