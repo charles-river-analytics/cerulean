@@ -152,12 +152,13 @@ class DimensionsFactory:
     def __call__(
         self,
         names: Union[str,tuple[str,...]],
-        n_cutpoints: Optional[int]=None
+        n_cutpoints: Optional[int]=None,
+        bins: Optional[np.ndarray]=None,
     ) -> Union[VariableDimensions, FactorDimensions]:
         if type(names) is str:
             if n_cutpoints is None:
                 raise ValueError("Must pass n_cutpoints for variable dimension generation!")
-            vd = VariableDimensions(self.names2strings[names], n_cutpoints)
+            vd = VariableDimensions(self.names2strings[names], n_cutpoints, bins=bins,)
             self.names2variables[names] = vd
 
         elif type(names) is tuple:

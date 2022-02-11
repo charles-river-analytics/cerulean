@@ -234,6 +234,9 @@ def continuous_to_variable_level(
 
 def _stationary_to_nonstationary_bins(inverse_stationarizer, centralized, bins: np.ndarray) -> np.ndarray:
     """
+    Transforms bins according to an inverse stationarizer and a centralized value.
+
+    Bins are transformed according to `bins <- inverse_stationarizer(bins, centralized)`.
     """
     the_inv = _Transform(
         inverse_stationarizer.name,
