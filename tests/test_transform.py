@@ -154,3 +154,23 @@ def test_inference_with_stationary():
         (d_nn, d_nb, d_bn),
         discrete_stationary_minmax.rename(columns=dim_factory.mapping())
     )
+
+
+@pytest.mark.bins
+def test_stationary_to_nonstationary_bins():
+    data = np.random.randn(1000)
+    num_bins = 25
+    _, bins = np.histogram(data, bins=num_bins)
+    logging.info(f"Generated {num_bins} from normal data:\n{bins}")
+
+    # shifted normal distribution
+    _, f_inv = transform.make_stationarizer("diff")
+    shift_mean = 101.0
+    shift_normal_bins = transform._stationary_to_nonstationary_bins(f_inv, shift_mean, bins)
+    logging.info(f"Converted bins to shfited normal with mean {shift_mean}:\n{shift_normal_bins}")
+
+    # log normal distribution
+    _, f_inv = transform.make_stationarizer("logdiff")
+    shift_lognormal_bins = transform._stationary_to_nonstationary_bins(f_inv, shift_mean, bins)
+    logging.info(f"Converted bins to shfited lognormal with scale {shift_mean}:\n{shift_lognormal_bins}")
+    
