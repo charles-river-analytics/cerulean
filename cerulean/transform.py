@@ -162,17 +162,37 @@ def to_stationary(
     )
 
 
+def create_discretization(n_bins: int, std_scale: float, the_data, return_bins=False,):
+    std_data = np.std(the_data)
+    bins = np.histogram_bin_edges(the_data, bins=n_bins)
+    low_edge = bins[0] - std_data * std_scale
+    high_edge = bins[-1] + std_data * std_scale
+    if return_bins:
+        return np.histogram_bin_edges(the_data, bins=n_bins, range=(low_edge, high_edge))
+    return (low_edge, high_edge)
+
+
 def _continuous_to_auto_variable_level(
     continuous_df: pd.DataFrame,
-    n_bins: int
+    n_bins: int,
+    std_scale: float=0.25,
 ) -> tuple[pd.DataFrame, np.ndarray]:
     """
     Computes a discretization inferring min and max from data.
     """
     to_df = dict()
     for col in continuous_df.columns:
-        # TODO: use the freqs for anything?
-        the_freqs, the_bins = np.histogram(continuous_df[col], bins=n_bins)
+        the_min, the_max = create_discretization(n_bins, std_scale, continuous_df[col])
+        the_freqs, the_bins = np.histogram(continuous_df[col], bins=n_bins, range=(the_min, the_max))
+        the_ixs = np.digitize(continuous_df[col].values, the_bins, right=True)
+        to_df[col] = the_ixs
+    return pd.DataFrame(to_df), the_bins
+
+
+def _continuous_to_bins_variable_level(continuous_df, the_bins):
+    to_df = dict()
+    for col in continuous_df.columns:
+        the_freqs, _ = np.histogram(continuous_df[col], bins=the_bins)
         the_ixs = np.digitize(continuous_df[col].values, the_bins, right=True)
         to_df[col] = the_ixs
     return pd.DataFrame(to_df), the_bins
@@ -202,7 +222,8 @@ def _continuous_to_specific_variable_level(
 
 def continuous_to_variable_level(
     continuous_df: pd.DataFrame,
-    n_cutpoints: int,
+    n_cutpoints: Optional[int]=3,
+    bins: Optional[np.ndarray]=None,
     the_min: Optional[float]=None,
     the_max: Optional[float]=None,
 ) -> tuple[pd.DataFrame, np.ndarray]:
@@ -220,16 +241,19 @@ def continuous_to_variable_level(
     """
     if (the_min is None) & (the_max is not None) | (the_min is not None) & (the_max is None):
         raise ValueError("Both the_min and the_max must be None, or neither.")
-    n_bins = max(n_cutpoints - 1, 2)
-    if the_max is None:
-        return _continuous_to_auto_variable_level(continuous_df, n_bins)
+    if bins is not None:
+        return _continuous_to_bins_variable_level(continuous_df, bins)
     else:
-        return _continuous_to_specific_variable_level(
-            continuous_df,
-            n_bins,
-            the_min,
-            the_max
-        )
+        n_bins = max(n_cutpoints - 1, 2)
+        if the_max is None:
+            return _continuous_to_auto_variable_level(continuous_df, n_bins)
+        else:
+            return _continuous_to_specific_variable_level(
+                continuous_df,
+                n_bins,
+                the_min,
+                the_max
+            )
 
 
 def _stationary_to_nonstationary_bins(inverse_stationarizer, centralized, bins: np.ndarray) -> np.ndarray:
