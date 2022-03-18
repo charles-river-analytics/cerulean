@@ -163,6 +163,13 @@ def to_stationary(
 
 
 def create_discretization(n_bins: int, std_scale: float, the_data, return_bins=False,):
+    """
+    Create bins to discretize data. 
+
+    First, creates an evenly-spaced number of bins using the min and max of data as
+    edges, Then, expands the bin size to the left and right by \pm std_scale * std(data).
+    Then, recomputes an evenly-spaced number of bins, which it returns.
+    """
     std_data = np.std(the_data)
     bins = np.histogram_bin_edges(the_data, bins=n_bins)
     low_edge = bins[0] - std_data * std_scale
@@ -190,6 +197,9 @@ def _continuous_to_auto_variable_level(
 
 
 def _continuous_to_bins_variable_level(continuous_df, the_bins):
+    """
+    Computes a discretization directly from passed bins.
+    """
     to_df = dict()
     for col in continuous_df.columns:
         the_freqs, _ = np.histogram(continuous_df[col], bins=the_bins)
