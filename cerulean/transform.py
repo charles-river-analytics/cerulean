@@ -140,7 +140,7 @@ def to_stationary(
     centralizer: Callable,
     stationarizer: Callable,
     records: pd.DataFrame
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame,pd.DataFrame]:
     """
     Generates a probably-stationary set of time series from a centralizing function,
     a stationarizing function, and a set of possibly-nonstationary time series.
