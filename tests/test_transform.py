@@ -210,3 +210,44 @@ def test_stationary_bins_in_dims():
     logging.info(f"Value {way_too_positive} maps to bin {high_bin}")
     normalish_bin = var1_dim[normalish]
     logging.info(f"Value {way_too_positive} maps to bin {normalish_bin}")
+
+@pytest.mark.bins
+def test_different_binning_strategies():
+    records = mock_price_dataframe()
+    records = records.resample('us').ffill()
+    logging.info(f"Original records: {records}")
+
+    s, s_inv = transform.make_stationarizer("diff")
+    stationary, centralized = transform.to_stationary(
+        np.mean, s, records
+    )
+    logging.info(f"Stationarized records: {stationary}")
+
+    n_cutpoints = 11
+
+    # choosing bin edges automatically
+    discrete_stationary, bins = transform.continuous_to_variable_level(
+        stationary,
+        n_cutpoints,
+    )
+    logging.info(f"Choosing bins automatically: {bins}")
+    logging.info(f"Data looks like:\n{discrete_stationary}")
+
+    # setting bin edges by fiat
+    discrete_stationary, bins = transform.continuous_to_variable_level(
+        stationary,
+        n_cutpoints,
+        the_min=-1.0,
+        the_max=1.0,
+    )
+    logging.info(f"Setting bin edges: {bins}")
+    logging.info(f"Data looks like:\n{discrete_stationary}")
+
+    # setting entire bins
+    bins = np.array([-1.0, -0.3, 0., 0.01, 0.02, 0.8])
+    discrete_stationary, bins = transform.continuous_to_variable_level(
+        stationary,
+        bins=bins,
+    )
+    logging.info(f"Setting entire bins: {bins}")
+    logging.info(f"Data looks like:\n{discrete_stationary}")
