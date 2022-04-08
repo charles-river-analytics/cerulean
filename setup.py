@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="cerulean",
-    version="0.0.1",
+    version="1.0.0",
     description="A library for learning, exact inference, and constraint satisfaction using factor graphs.",
     url="https://git.collab.cra.com/projects/PROP/repos/models/browse",
     author="David Rushing Dewhurst, Joseph Campolongo, Mike Reposa",
