@@ -131,6 +131,7 @@ def test_inference_with_stationary():
     discrete_stationary_minmax, minmax_bins = transform.continuous_to_variable_level(
         stationary,
         n_cutpoints,
+        None,
         -0.02,
         0.02
     )
