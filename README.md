@@ -31,7 +31,7 @@ To build and pip install into the environment:
 + `cd your/cerulean/dir`
 + `python -m pip install build` # one-time
 + `python -m build`
-+ `python -m pip install --find-links https://download.pytorch.org/whl/cu113/torch_stable.html dist/cerulean-1.0.0-py3-none-any.whl`
++ `python -m pip install --find-links https://download.pytorch.org/whl/cu113/torch_stable.html dist/cerulean-1.0.1-py3-none-any.whl`
   
 ## Testing
 This project uses `pytest`. In the top-level directory, run `/opt/anaconda3/envs/proper-fm/bin/python -m pytest --cov=cerulean` 
