@@ -2,7 +2,6 @@
 import itertools
 from typing import Literal, Union
 
-import mypy
 import torch
 
 from . import dimensions, factor
@@ -145,7 +144,7 @@ def all_different(
     Enforces the constraint that values of all passed variables must be different.
 
     If :math:`N \geq 2` is the number of variables for which the constraint must hold,
-    this function returns a tuple of :math:`N(N - 1)/2` `ConstraintFactor`s.
+    this function returns a tuple of :math:`N(N - 1)/2` ``ConstraintFactors``.
     """
     return (
         ConstraintFactor.pairwise(
@@ -164,7 +163,7 @@ def all_equal(
     Enforces the constraint that values of all passed variables must be equal.
 
     If :math:`N \geq 2` is the number of variables for which the constraint must hold,
-    this function returns a tuple of :math:`N(N - 1)/2` `ConstraintFactor`s.
+    this function returns a tuple of :math:`N(N - 1)/2` ``ConstraintFactors``.
     """
     return (
         ConstraintFactor.pairwise(
