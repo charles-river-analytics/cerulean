@@ -1,7 +1,6 @@
 
 from typing import Mapping, Optional, Union, Tuple
 
-import mypy
 import numpy as np
 
 from . import transform

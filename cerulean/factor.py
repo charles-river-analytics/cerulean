@@ -427,7 +427,7 @@ class FactorGraph(abc.ABC):
 
 class DiscreteFactorGraph(FactorGraph):
     """
-    A `DiscreteFactorGraph` is a collection of `DiscreteFactor`s which together constitute
+    A ``DiscreteFactorGraph`` is a collection of ``DiscreteFactors`` which together constitute
     a bipartite graph linking variables to factors. The graph is represented only implicitly;
     no graph is ever constructed.
     """
@@ -578,12 +578,12 @@ class DiscreteFactorGraph(FactorGraph):
     ):
         """Learns parameters of factors in a factor graph from data.
 
-        + `dimensions`: an iterable of `FactorDimensions`, each of which describes the variables
+        + ``dimensions``: an iterable of ``FactorDimensions``, each of which describes the variables
             related by that factor.
-        + `data`: `pandas.DataFrame`. Each column must be equal length and correspond to observations
+        + ``data``: ``pandas.DataFrame``. Each column must be equal length and correspond to observations
             of the variable given in the header of the column.
-        + `num_workers`: (default 1)  the number of workers used during learning *used only if 
-             the data is a `Callable` that returns an iterable*.  The iterable itself **must** 
+        + ``num_workers``: (default 1)  the number of workers used during learning *used only if 
+             the data is a ``Callable`` that returns an iterable*.  The iterable itself **must** 
              know the number of workers so that it can split up its data between each worker
              appropriately. 
         """
@@ -672,6 +672,7 @@ class DiscreteFactorGraph(FactorGraph):
         provided name is used.  Both are relative to the current working directory.
         
         .. code-block:: python
+        
             type(self).__name__ + '_' + ts.strftime('%Y%m%dT%H%M%S.%f') + '.pkl'
             
         This method saves the following fields using pickle:
