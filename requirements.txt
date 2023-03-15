@@ -1,7 +1,5 @@
 attrs==22.2.0
 build==0.10.0
-certifi @ file:///private/var/folders/sy/f16zz6x50xz3113nwtb9bvq00000gp/T/abs_477u68wvzm/croot/certifi_1671487773341/work/certifi
-cerulean @ file:///Users/ddewhurst/Documents/projects/PROPER-FM/code/cerulean
 contourpy==1.0.7
 coverage==7.2.1
 cycler==0.11.0

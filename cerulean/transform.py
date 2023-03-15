@@ -3,7 +3,6 @@ import datetime
 import logging
 from typing import Callable, Iterable, Literal, Optional
 
-import mypy
 import numpy as np
 from opt_einsum.parser import get_symbol
 import pandas as pd
