@@ -1,9 +1,15 @@
+attrs==22.2.0
 build==0.10.0
+certifi @ file:///private/var/folders/sy/f16zz6x50xz3113nwtb9bvq00000gp/T/abs_477u68wvzm/croot/certifi_1671487773341/work/certifi
+cerulean @ file:///Users/ddewhurst/Documents/projects/PROPER-FM/code/cerulean
 contourpy==1.0.7
+coverage==7.2.1
 cycler==0.11.0
+exceptiongroup==1.1.1
 filelock==3.9.1
 fonttools==4.39.0
 importlib-resources==5.12.0
+iniconfig==2.0.0
 Jinja2==3.1.2
 kiwisolver==1.4.4
 MarkupSafe==2.1.2
@@ -17,10 +23,13 @@ opt-einsum==3.3.0
 packaging==23.0
 pandas==1.5.3
 Pillow==9.4.0
+pluggy==1.0.0
 pyparsing==3.0.9
 pyproject_hooks==1.0.0
 pyro-api==0.1.2
 pyro-ppl==1.5.0
+pytest==7.2.2
+pytest-cov==4.0.0
 python-dateutil==2.8.2
 pytz==2022.7.1
 six==1.16.0
