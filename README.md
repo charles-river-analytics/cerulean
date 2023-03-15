@@ -1,40 +1,35 @@
 # cerulean
 
-`cerulean` is a library for learning, exact inference, and constraint satisfaction using discrete factor graphs. 
-It is developed as part of the PROPER-FM effort under DARPA I2O ECoSystemic.
+`cerulean` is a library for learning, exact inference, and constraint satisfaction using discrete factor graphs.
+It is fast, using multiple complementary memoization strategies for maximal speed at the cost of higher memory usage, and has a convenient, software engineering-oriented interface. 
+It builds on `pyro` for probabilistic modeling fundamentals and `opt-einsum` for contraction path computation.
+
+## Examples
+
+There are many examples in the [examples directory](./examples/):
+
++ [Random inference](./examples/random_inference.py): a collection of random inference problems for benchmarking. 
+    Includes (a) inference of marginal densities in chain models; (b) inference of marginals and N-1 dimensional (all but one variable) in a 
+    fully connected network.
++ [Random graph inference](./examples/benchmark.py): queries on random graphs (ER model) of varying number of nodes, connection probability, and variable dimensions.
++ [End-to-end basic](./examples/end_to_end_basic.py): example of an end-to-end inference problem using (hypothetical) quote data from three trading venues.
+    Includes application of stationarizing transforms ([`cerulean.transform`](./cerulean/transform.py)).
+
 
 ## Installation
 
-To use the latest cerulean development Docker image (requires Docker be installed):
-- First, if you haven't done so, create a CRA collaboration DTR access token (one time step)
-    - Point a browser at `dtr.collab.cra.com` and login
-    - Create a new Access Token (under the Profile menu)
-    - Record the access token and don't lose it; you will use as a password later
-- Open a command prompt
-- `docker login dtr.collab.cra.com --username=<your_dtr_username>`
-    - Use your DTR access token as your password
-- `docker pull dtr.collab.cra.com/proper-fm/cerulean:<tag>`
-- `docker run -it dtr.collab.cra.com/proper-fm/cerulean:<tag>`
-- `conda activate proper-fm`
-
 To install and work on this package locally:
-+ `conda create --name proper-fm python=3.9`
-+ `/opt/anaconda3/envs/proper-fm/bin/python -m pip install -r requirements.txt`
++ `conda create --name cerulean python=3.9`
++ `/my/anaconda/envs/cerulean/bin/python -m pip install -r requirements.txt`
 
 To install as part of another project:
 + `cd your/cerulean/dir`
-+ `git clone https://git.collab.cra.com/scm/prop/cerulean.git`
++ `git clone https://github.com/charles-river-analytics/cerulean.git`
++ `cd my/other/project/dir`
 + `pip install -e your/cerulean/dir`
-
-To build and pip install into the environment:
-+ `conda activate proper-fm`
-+ `cd your/cerulean/dir`
-+ `python -m pip install build` # one-time
-+ `python -m build`
-+ `python -m pip install --find-links https://download.pytorch.org/whl/cu113/torch_stable.html dist/cerulean-1.0.1-py3-none-any.whl`
   
 ## Testing
-This project uses `pytest`. In the top-level directory, run `/opt/anaconda3/envs/proper-fm/bin/python -m pytest --cov=cerulean` 
+This project uses `pytest`. In the top-level directory, run `/my/anaconda/envs/cerulean/bin/python -m pytest --cov=cerulean` 
 to execute all tests and see statistics of test coverage.
 
 ## Documentation
@@ -48,12 +43,10 @@ This project uses Sphinx to build its documentation. To build the documentation:
 ## Examples
 
 In order to run the examples, you have to install `cerulean` as a python package. To do that, just navigate to the directory in which 
-it's located and `/opt/anaconda3/envs/proper-fm/bin/python -m pip install -e .`.
+it's located and `/my/anaconda/envs/cerulean/bin/python -m pip install -e .`.
 
 ## Acknowledgements and other information
 
-We are grateful for funding from DARPA under contract HR00112290006.
-
-Copyright Charles River Analytics Inc., David Rushing Dewhurst, Joseph Campolongo, and Mike Reposa, 2021 - present.
-All rights reserved.
-This library is *not* to be used outside Charles River Analytics or DARPA without authorization from DARPA PM or higher authority.
+This work was funded by DARPA under contract HR00112290006.
+Copyright Charles River Analytics Inc., 2021 - present. `cerulean` is released under the LGPLv3 license.
+Approved for public release, distribution is unlimited.
